@@ -1,0 +1,23 @@
+[project]
+name = "dvorak10-scoring"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Arno Klein"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "scikit-learn (>=1.7.0,<2.0.0)",
+    "scipy (>=1.15.3,<2.0.0)",
+    "matplotlib (>=3.10.3,<4.0.0)",
+    "seaborn (>=0.13.2,<0.14.0)",
+    "statsmodels (>=0.14.4,<0.15.0)",
+    "tqdm (>=4.67.1,<5.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

@@ -23,7 +23,16 @@ SAME-HAND CRITERIA (apply only to same-hand digraphs):
 The test_dvorak10.py script analyzes whether Dvorak's 10 criteria 
 correlate with actual typing performance, splitting the analysis 
 by middle column key usage to understand if lateral index finger 
-movements affect criterion validity.
+movements affect criterion validity, and regressing out letter 
+frequency effects.
+
+## Regressing out letter/bigram frequency
+Log-transform frequency (psycholinguistic standard):
+`log_freq = np.log10(frequency + 1)`
+Regression: time ~ log_frequency:
+`model = sm.OLS(time, log_freq).fit()`
+Frequency-adjusted time = residual + mean:
+`adjusted_time = time - predicted_time + overall_mean`
 
 ANALYSIS APPROACH:
 1. Word typing times (criteria 1-2: two-hand criteria)
