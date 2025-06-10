@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Test correlations between Dvorak-9 criteria and typing speed with frequency control.
+Test correlations between Dvorak-9 criteria and bigram typing speed with frequency control.
 
 This script analyzes how well each of the 9 Dvorak criteria correlates with actual
-typing speed data, including frequency regression to control for letter/bigram 
+bigram typing speed data, including frequency regression to control for bigram 
 frequency effects in English.
 
 Features:
-- Frequency regression for both word-level and bigram-level analyses
+- Bigram-level correlation analysis only (word analysis removed)
+- Frequency regression to control for bigram frequency effects
 - Split analysis by middle column inclusion (T,G,B,Y,H,N)
 - Both raw and frequency-adjusted correlation analyses
 - Enhanced statistical reporting with multiple comparison correction
@@ -15,11 +16,10 @@ Features:
 - Progress monitoring and sample limiting for large datasets
 
 Usage:
-    python test_dvorak9_speed.py [--max-bigrams N] [--max-words N] [--progress-interval N]
+    python test_dvorak9_speed.py [--max-bigrams N] [--progress-interval N]
     
 Arguments:
     --max-bigrams N       Limit bigram analysis to N samples (default: unlimited)
-    --max-words N         Limit word analysis to N samples (default: unlimited)
     --progress-interval N Show progress every N samples (default: 1000)
 """
 
@@ -77,18 +77,15 @@ MIDDLE_COLUMN_KEYS = {'t', 'g', 'b', 'y', 'h', 'n'}
 output_file = None
 progress_config = {
     'max_bigrams': None,
-    'max_words': None,
     'progress_interval': 1000,
     'start_time': None
 }
 
 def parse_arguments():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='Analyze Dvorak-9 criteria correlation with typing speed')
+    parser = argparse.ArgumentParser(description='Analyze Dvorak-9 criteria correlation with bigram typing speed')
     parser.add_argument('--max-bigrams', type=int, default=None,
                        help='Limit bigram analysis to N samples (default: unlimited)')
-    parser.add_argument('--max-words', type=int, default=None,
-                       help='Limit word analysis to N samples (default: unlimited)')
     parser.add_argument('--progress-interval', type=int, default=1000,
                        help='Show progress every N samples (default: 1000)')
     parser.add_argument('--random-seed', type=int, default=42,
@@ -133,32 +130,12 @@ def create_qwerty_mapping():
     """Create standard QWERTY layout mapping."""
     return dict(zip(QWERTY_ITEMS.lower(), QWERTY_POSITIONS.upper()))
 
-def load_frequency_data(letter_freq_path=None, bigram_freq_path=None):
-    """Load frequency data from CSV files for regression analysis."""
-    letter_frequencies = None
+def load_frequency_data(bigram_freq_path=None):
+    """Load bigram frequency data from CSV files for regression analysis."""
     bigram_frequencies = None
     
     print_and_log("🔍 Loading frequency data for regression analysis...")
     print_and_log("   (This uses pre-calculated English language frequencies, NOT sample frequencies)")
-    
-    try:
-        if letter_freq_path and os.path.exists(letter_freq_path):
-            letter_frequencies = pd.read_csv(letter_freq_path)
-            print_and_log(f"✅ Loaded letter frequency data: {len(letter_frequencies):,} entries")
-            print_and_log(f"   Columns: {list(letter_frequencies.columns)}")
-            
-            # Show some examples
-            if not letter_frequencies.empty:
-                print_and_log("   Sample letter frequencies:")
-                for i, row in letter_frequencies.head(3).iterrows():
-                    if 'item' in row and 'score' in row:
-                        print_and_log(f"     '{row['item']}': {row['score']}")
-                    else:
-                        print_and_log(f"     Row {i}: {dict(row)}")
-        else:
-            print_and_log(f"⚠️  Letter frequency file not found: {letter_freq_path}")
-    except Exception as e:
-        print_and_log(f"❌ Error loading letter frequency data: {str(e)}")
     
     try:
         if bigram_freq_path and os.path.exists(bigram_freq_path):
@@ -181,7 +158,7 @@ def load_frequency_data(letter_freq_path=None, bigram_freq_path=None):
     except Exception as e:
         print_and_log(f"❌ Error loading bigram frequency data: {str(e)}")
     
-    return letter_frequencies, bigram_frequencies
+    return bigram_frequencies
 
 def adjust_sequence_times_for_frequency(sequences, times, freq_data, sequence_type='word'):
     """
@@ -329,10 +306,31 @@ def adjust_sequence_times_for_frequency(sequences, times, freq_data, sequence_ty
         print_and_log(f"        Maximum: {max_adjustment:.2f}ms") 
         print_and_log(f"        Changed >0.1ms: {pct_changed:.1f}% of sequences")
         
+        # CRITICAL: Check if rank order changed
+        from scipy.stats import spearmanr as rank_corr
+        raw_ranks = np.argsort(np.argsort(times))
+        adj_ranks = np.argsort(np.argsort(adjusted_times))
+        
+        rank_correlation = rank_corr(raw_ranks, adj_ranks)[0]
+        rank_changes = np.sum(raw_ranks != adj_ranks)
+        max_rank_change = np.max(np.abs(raw_ranks - adj_ranks))
+        
+        print_and_log(f"      📊 RANK ORDER ANALYSIS:")
+        print_and_log(f"        Correlation between raw and adjusted ranks: {rank_correlation:.6f}")
+        print_and_log(f"        Sequences with rank changes: {rank_changes}/{len(times)} ({100*rank_changes/len(times):.1f}%)")
+        print_and_log(f"        Maximum rank position change: {max_rank_change}")
+        
+        if rank_correlation > 0.99:
+            print_and_log(f"  ⚠️  EXPLANATION: Rank order barely changed (r={rank_correlation:.6f})")
+            print_and_log(f"      This is why Spearman correlations are identical!")
+            print_and_log(f"      Frequency effects are real but too small to change rankings")
+        
         if avg_adjustment < 1.0:
             print_and_log(f"  ⚠️  Small adjustment magnitude may explain similar raw/adjusted results")
         
         print_and_log(f"  ✅ Adjusted {sequence_type} times for frequency")
+        print_and_log(f"  💡 SUMMARY: Frequency adjustment is working, but check rank order changes above")
+        print_and_log(f"      to understand why Spearman correlations may be identical")
         
         return adjusted_times, freq_dict, model_info
     
@@ -489,12 +487,66 @@ def read_bigram_times(filename, min_threshold=50, max_threshold=2000, use_percen
     times = []
     
     try:
-        # First pass: count total lines
+        # First pass: count total lines and inspect data quality
         print_and_log(f"Reading bigram data from {filename}...")
+        print_and_log(f"📋 BIGRAM DATA QUALITY VERIFICATION")
+        print_and_log(f"   Expected: Correctly typed bigrams from correctly typed words")
+        print_and_log(f"   Required CSV columns: 'bigram', 'interkey_interval'")
+        
+        # Quick sample to verify data format
+        sample_bigrams = []
+        with open(filename, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            
+            # Check column names
+            columns = reader.fieldnames
+            print_and_log(f"   Found columns: {columns}")
+            
+            if 'bigram' not in columns or 'interkey_interval' not in columns:
+                print_and_log(f"   ❌ Missing required columns!")
+                return [], []
+            
+            # Sample first 10 rows for inspection
+            for i, row in enumerate(reader):
+                if i >= 10:
+                    break
+                bigram = row['bigram'].lower().strip()
+                try:
+                    time_val = float(row['interkey_interval'])
+                    sample_bigrams.append((bigram, time_val))
+                except ValueError:
+                    print_and_log(f"   ⚠️  Invalid time value in row {i+1}: {row['interkey_interval']}")
+        
+        # Show sample data
+        print_and_log(f"   Sample bigrams from CSV:")
+        for bigram, time_val in sample_bigrams[:5]:
+            print_and_log(f"     '{bigram}': {time_val:.1f}ms")
+        
+        # Now count total lines
         with open(filename, 'r', newline='', encoding='utf-8') as file:
             total_lines = sum(1 for _ in file) - 1  # Subtract header
         
-        print_and_log(f"Found {total_lines:,} bigrams in file")
+        print_and_log(f"   Total bigrams in file: {total_lines:,}")
+        
+        # Verify bigram quality
+        valid_chars = set(QWERTY_ITEMS.lower())
+        common_bigrams = set(['th', 'he', 'in', 'er', 'an', 'ed', 'nd', 'to', 'en', 'ti'])
+        sample_check = [bg for bg, _ in sample_bigrams]
+        
+        # Check for common English bigrams
+        common_found = sum(1 for bg in sample_check if bg in common_bigrams)
+        print_and_log(f"   Quality indicators:")
+        print_and_log(f"     Common English bigrams in sample: {common_found}/{len(sample_check)} ({100*common_found/len(sample_check):.1f}%)")
+        
+        # Check for suspicious patterns (repeated chars, non-letters)
+        suspicious = sum(1 for bg in sample_check if len(set(bg)) == 1 or not all(c in valid_chars for c in bg))
+        print_and_log(f"     Suspicious bigrams (repeated/invalid chars): {suspicious}/{len(sample_check)} ({100*suspicious/len(sample_check):.1f}%)")
+        
+        if suspicious > len(sample_check) * 0.3:
+            print_and_log(f"   ⚠️  High rate of suspicious bigrams - data quality may be poor")
+        
+        print_and_log(f"   ✅ Proceeding with data loading...")
+        print_and_log()
         
         # Determine sample size
         if max_samples and max_samples < total_lines:
@@ -505,19 +557,19 @@ def read_bigram_times(filename, min_threshold=50, max_threshold=2000, use_percen
                 reader = csv.DictReader(file)
                 for row in reader:
                     bigram = row['bigram'].lower().strip()
-                    time = float(row['interkey_interval'])
+                    time_val = float(row['interkey_interval'])
                     
                     # Only include bigrams with characters in our layout
                     if len(bigram) == 2 and all(c in QWERTY_ITEMS.lower() for c in bigram):
-                        all_data.append((bigram, time))
+                        all_data.append((bigram, time_val))
             
             # Random sample
             random.shuffle(all_data)
             sample_data = all_data[:max_samples]
             
-            for bigram, time in sample_data:
+            for bigram, time_val in sample_data:
                 bigrams.append(bigram)
-                times.append(time)
+                times.append(time_val)
         else:
             # Read all data with progress monitoring
             with open(filename, 'r', newline='', encoding='utf-8') as file:
@@ -552,10 +604,26 @@ def read_bigram_times(filename, min_threshold=50, max_threshold=2000, use_percen
     if not times:
         return bigrams, times
     
-    # Apply filtering
+    # Final data quality check
     original_count = len(times)
     print_and_log(f"Loaded {original_count:,} valid bigrams")
     
+    # Check for data quality issues in the full dataset
+    unique_bigrams = len(set(bigrams))
+    common_english_count = sum(1 for bg in bigrams if bg in common_bigrams)
+    
+    print_and_log(f"📊 FINAL DATA QUALITY SUMMARY:")
+    print_and_log(f"   Unique bigrams: {unique_bigrams:,}")
+    print_and_log(f"   Common English bigrams: {common_english_count:,} ({100*common_english_count/len(bigrams):.1f}%)")
+    print_and_log(f"   Average time: {np.mean(times):.1f}ms ± {np.std(times):.1f}ms")
+    
+    if common_english_count < len(bigrams) * 0.1:
+        print_and_log(f"   ⚠️  Low rate of common English bigrams - verify data source")
+    else:
+        print_and_log(f"   ✅ Data quality looks reasonable")
+    print_and_log()
+    
+    # Apply time-based filtering
     if use_percentile_filter:
         p5 = np.percentile(times, 5)
         p95 = np.percentile(times, 95)
@@ -576,95 +644,6 @@ def read_bigram_times(filename, min_threshold=50, max_threshold=2000, use_percen
         print_and_log(f"  Time range: {min(filtered_times):.1f} - {max(filtered_times):.1f}ms")
     
     return filtered_bigrams, filtered_times
-
-def read_word_times(filename, max_threshold=None, use_percentile_filter=False, max_samples=None):
-    """Read word times from CSV file with optional filtering and progress monitoring."""
-    words = []
-    times = []
-    
-    try:
-        # First pass: count total lines
-        print_and_log(f"Reading word data from {filename}...")
-        with open(filename, 'r', newline='', encoding='utf-8') as file:
-            total_lines = sum(1 for _ in file) - 1  # Subtract header
-        
-        print_and_log(f"Found {total_lines:,} words in file")
-        
-        # Determine sample size
-        if max_samples and max_samples < total_lines:
-            print_and_log(f"Will randomly sample {max_samples:,} words")
-            # Read all lines first, then sample
-            all_data = []
-            with open(filename, 'r', newline='', encoding='utf-8') as file:
-                reader = csv.DictReader(file)
-                for row in reader:
-                    word = row['word'].strip()
-                    time = float(row['time'])
-                    all_data.append((word, time))
-            
-            # Random sample
-            random.shuffle(all_data)
-            sample_data = all_data[:max_samples]
-            
-            for word, time in sample_data:
-                words.append(word)
-                times.append(time)
-        else:
-            # Read all data with progress monitoring
-            with open(filename, 'r', newline='', encoding='utf-8') as file:
-                reader = csv.DictReader(file)
-                
-                if TQDM_AVAILABLE:
-                    reader = tqdm(reader, total=total_lines, desc="Reading words")
-                
-                processed = 0
-                start_time = time.time()
-                
-                for row in reader:
-                    word = row['word'].strip()
-                    time_val = float(row['time'])
-                    
-                    words.append(word)
-                    times.append(time_val)
-                    
-                    processed += 1
-                    if not TQDM_AVAILABLE and processed % progress_config['progress_interval'] == 0:
-                        print_progress(processed, total_lines, "Reading words", start_time)
-    
-    except FileNotFoundError:
-        print_and_log(f"Error: {filename} not found")
-        return [], []
-    except Exception as e:
-        print_and_log(f"Error reading {filename}: {e}")
-        return [], []
-    
-    if not times or max_threshold is None:
-        print_and_log(f"Loaded {len(words):,} words")
-        return words, times
-    
-    # Apply filtering 
-    original_count = len(times)
-    print_and_log(f"Loaded {original_count:,} words")
-    
-    if use_percentile_filter:
-        p95 = np.percentile(times, 95)
-        filtered_indices = [i for i, t in enumerate(times) if t <= p95]
-        filter_method = f"95th percentile ({p95:.1f}ms)"
-    else:
-        filtered_indices = [i for i, t in enumerate(times) if t <= max_threshold]
-        filter_method = f"absolute threshold ({max_threshold}ms)"
-    
-    # Apply filtering
-    filtered_words = [words[i] for i in filtered_indices]
-    filtered_times = [times[i] for i in filtered_indices]
-    
-    removed_count = original_count - len(filtered_times)
-    if removed_count > 0:
-        print_and_log(f"Filtered {removed_count:,}/{original_count:,} words using {filter_method}")
-        print_and_log(f"  Kept {len(filtered_times):,} words ({len(filtered_times)/original_count*100:.1f}%)")
-        print_and_log(f"  Time range: {min(filtered_times):.1f} - {max(filtered_times):.1f}ms")
-    
-    return filtered_words, filtered_times
 
 def analyze_bigram_correlations_with_frequency(bigrams, times, bigram_freq_data=None):
     """Analyze correlations between all 9 criteria and bigram times with frequency control."""
@@ -721,68 +700,6 @@ def analyze_bigram_correlations_with_frequency(bigrams, times, bigram_freq_data=
             "Bigrams (With Middle Columns)",
             freq_data=bigram_freq_data,
             sequence_type='bigram'
-        )
-        for criterion, data in group_results.items():
-            results[f"{criterion}_with_middle"] = data
-    
-    return results
-
-def analyze_word_correlations_with_frequency(words, times, letter_freq_data=None):
-    """Analyze correlations between all 9 criteria and word times with frequency control."""
-    layout_mapping = create_qwerty_mapping()
-    
-    # All 9 Dvorak criteria - analyzed at WORD level
-    criteria_names = {
-        'hands': 'Hands (alternating)',
-        'fingers': 'Fingers (different)',
-        'skip_fingers': 'Skip Fingers',
-        'dont_cross_home': "Don't Cross Home",
-        'same_row': 'Same Row',
-        'home_row': 'Home Row',
-        'columns': 'Columns',
-        'strum': 'Strum (inward)',
-        'strong_fingers': 'Strong Fingers'
-    }
-    
-    print_and_log("Analyzing word correlations with frequency control...")
-    print_and_log("NOTE: All 9 criteria are measured at WORD level")
-    print_and_log("for correlation with word typing speed.")
-    print_and_log(f"Total words: {len(words)}")
-    
-    # Split data by middle column inclusion
-    with_middle, without_middle = split_data_by_middle_columns(words, times, layout_mapping)
-    
-    print_and_log(f"\nData split:")
-    print_and_log(f"  With middle columns: {len(with_middle['sequences'])} words")
-    print_and_log(f"  Without middle columns: {len(without_middle['sequences'])} words")
-    
-    # Analyze each group separately
-    results = {}
-    
-    # Group 1: Words WITHOUT middle column keys
-    if without_middle['sequences']:
-        group_results = analyze_criteria_for_group_with_frequency(
-            without_middle['sequences'], 
-            without_middle['times'], 
-            layout_mapping, 
-            criteria_names, 
-            "Words (No Middle Columns)",
-            freq_data=letter_freq_data,
-            sequence_type='word'
-        )
-        for criterion, data in group_results.items():
-            results[f"{criterion}_no_middle"] = data
-    
-    # Group 2: Words WITH middle column keys
-    if with_middle['sequences']:
-        group_results = analyze_criteria_for_group_with_frequency(
-            with_middle['sequences'], 
-            with_middle['times'], 
-            layout_mapping, 
-            criteria_names, 
-            "Words (With Middle Columns)",
-            freq_data=letter_freq_data,
-            sequence_type='word'
         )
         for criterion, data in group_results.items():
             results[f"{criterion}_with_middle"] = data
@@ -1125,63 +1042,54 @@ def main():
     # Update progress configuration
     progress_config.update({
         'max_bigrams': args.max_bigrams,
-        'max_words': args.max_words,
         'progress_interval': args.progress_interval,
         'start_time': time.time()
     })
     
     # Open output file
-    output_file = open('test_dvorak9_speed_analysis.txt', 'w', encoding='utf-8')
+    output_file = open('dvorak9_bigram_analysis_results.txt', 'w', encoding='utf-8')
     
     try:
-        print_and_log("Dvorak-9 Criteria Correlation Analysis with Frequency Control")
+        print_and_log("Dvorak-9 Criteria Correlation Analysis - Bigram Speed")
         print_and_log("=" * 80)
         print_and_log(f"Configuration:")
         print_and_log(f"  Max bigrams: {args.max_bigrams or 'unlimited'}")
-        print_and_log(f"  Max words: {args.max_words or 'unlimited'}")
         print_and_log(f"  Progress interval: {args.progress_interval:,}")
         print_and_log(f"  Random seed: {args.random_seed}")
         print_and_log(f"  Middle column keys: {', '.join(sorted(MIDDLE_COLUMN_KEYS))}")
         print_and_log("  Analysis includes both raw and frequency-adjusted correlations")
+        print_and_log("  Focus: Bigram-level analysis only (word analysis removed)")
         print_and_log()
         
         # Load frequency data
         print_and_log("Loading frequency data...")
-        letter_freq_file = 'input/letter_frequencies_english.csv'
         bigram_freq_file = 'input/letter_pair_frequencies_english.csv'
         
-        letter_frequencies, bigram_frequencies = load_frequency_data(
-            letter_freq_file, bigram_freq_file
-        )
+        bigram_frequencies = load_frequency_data(bigram_freq_file)
         
         # Verify we're using language frequencies, not sample frequencies
         print_and_log(f"\n🔬 FREQUENCY DATA VERIFICATION")
         print_and_log(f"{'='*50}")
+        print_and_log("This analysis uses PRE-CALCULATED English language frequencies,")
+        print_and_log("NOT frequencies calculated from your typing sample.")
         print_and_log()
-        if letter_frequencies is not None:
-            print_and_log(f"✅ Letter frequencies loaded: {len(letter_frequencies):,} entries")
-        else:
-            print_and_log(f"❌ No letter frequency data available")
-            
+        
         if bigram_frequencies is not None:
             print_and_log(f"✅ Bigram frequencies loaded: {len(bigram_frequencies):,} entries") 
         else:
             print_and_log(f"❌ No bigram frequency data available")
+        
         print_and_log(f"{'='*50}")
         print_and_log()
         
         # Read typing data files
         print_and_log("\nReading typing data files...")
         bigram_times_file = '../process_3.5M_keystrokes/output/bigram_times.csv'
-        word_times_file = '../process_3.5M_keystrokes/output/word_times.csv'
         
         # FILTERING PARAMETERS
         MIN_INTERVAL = 50
         MAX_INTERVAL = 2000
         USE_PERCENTILE_BIGRAMS = False
-        
-        MAX_WORD_TIME = None
-        USE_PERCENTILE_WORDS = False
         
         # Read the data files with progress monitoring
         bigrams, bigram_times = read_bigram_times(
@@ -1192,15 +1100,8 @@ def main():
             max_samples=args.max_bigrams
         )
         
-        words, word_times = read_word_times(
-            word_times_file,
-            max_threshold=MAX_WORD_TIME,
-            use_percentile_filter=USE_PERCENTILE_WORDS,
-            max_samples=args.max_words
-        )
-        
-        if not bigrams and not words:
-            print_and_log("Error: No valid data found in CSV files.")
+        if not bigrams:
+            print_and_log("Error: No valid bigram data found in CSV files.")
             sys.exit(1)
         
         # Create output directory for plots
@@ -1209,63 +1110,43 @@ def main():
         
         # Analyze correlations with frequency control
         print_and_log(f"\n{'='*80}")
-        print_and_log("STARTING CORRELATION ANALYSIS")
+        print_and_log("STARTING BIGRAM CORRELATION ANALYSIS")
         print_and_log(f"{'='*80}")
         
         analysis_start_time = time.time()
-        bigram_results = {}
-        word_results = {}
         
-        if bigrams:
-            print_and_log(f"\nBIGRAM ANALYSIS")
-            print_and_log(f"Processing {len(bigrams):,} bigrams...")
-            bigram_start = time.time()
-            
-            bigram_results = analyze_bigram_correlations_with_frequency(
-                bigrams, bigram_times, bigram_frequencies
-            )
-            
-            bigram_elapsed = time.time() - bigram_start
-            print_and_log(f"Bigram analysis completed in {format_time(bigram_elapsed)}")
+        print_and_log(f"\nBIGRAM ANALYSIS")
+        print_and_log(f"Processing {len(bigrams):,} bigrams...")
+        bigram_start = time.time()
         
-        if words:
-            print_and_log(f"\nWORD ANALYSIS")
-            print_and_log(f"Processing {len(words):,} words...")
-            word_start = time.time()
-            
-            word_results = analyze_word_correlations_with_frequency(
-                words, word_times, letter_frequencies
-            )
-            
-            word_elapsed = time.time() - word_start
-            print_and_log(f"Word analysis completed in {format_time(word_elapsed)}")
+        bigram_results = analyze_bigram_correlations_with_frequency(
+            bigrams, bigram_times, bigram_frequencies
+        )
         
-        # Combine all results
-        all_results = {}
-        all_results.update(bigram_results)
-        all_results.update(word_results)
+        bigram_elapsed = time.time() - bigram_start
+        print_and_log(f"Bigram analysis completed in {format_time(bigram_elapsed)}")
         
         total_analysis_time = time.time() - analysis_start_time
         print_and_log(f"\nTotal analysis time: {format_time(total_analysis_time)}")
         
-        if all_results:
+        if bigram_results:
             # Print correlation tables with frequency comparison
             print_correlation_results_with_frequency(
-                all_results, 
-                "CORRELATION ANALYSIS: RAW vs FREQUENCY-ADJUSTED"
+                bigram_results, 
+                "BIGRAM CORRELATION ANALYSIS: RAW vs FREQUENCY-ADJUSTED"
             )
             
             # Create frequency comparison plots
             print_and_log(f"\nGenerating comparison plots...")
             plot_start = time.time()
-            create_frequency_comparison_plots(all_results)
+            create_frequency_comparison_plots(bigram_results)
             plot_elapsed = time.time() - plot_start
             print_and_log(f"Plot generation completed in {format_time(plot_elapsed)}")
             
             # Analyze criterion interactions
             print_and_log(f"\nAnalyzing criterion interactions...")
             interaction_start = time.time()
-            analyze_criterion_interactions(all_results)
+            analyze_criterion_interactions(bigram_results)
             interaction_elapsed = time.time() - interaction_start
             print_and_log(f"Interaction analysis completed in {format_time(interaction_elapsed)}")
             
@@ -1280,7 +1161,7 @@ def main():
             keys_raw = []
             keys_adj = []
             
-            for key, data in all_results.items():
+            for key, data in bigram_results.items():
                 if 'spearman_p' in data:
                     if '_raw_' in key:
                         p_values_raw.append(data['spearman_p'])
@@ -1299,7 +1180,7 @@ def main():
                 for i, key in enumerate(keys_raw):
                     if rejected_raw[i]:
                         any_sig_raw = True
-                        data = all_results[key]
+                        data = bigram_results[key]
                         direction = "↓ Faster" if data['spearman_r'] < 0 else "↑ Slower"
                         print_and_log(f"  {data['name']} ({data['group']}): r={data['spearman_r']:.3f}, p_adj={p_adj_raw[i]:.3f} {direction}")
                 if not any_sig_raw:
@@ -1312,7 +1193,7 @@ def main():
                 for i, key in enumerate(keys_adj):
                     if rejected_adj[i]:
                         any_sig_adj = True
-                        data = all_results[key]
+                        data = bigram_results[key]
                         direction = "↓ Faster" if data['spearman_r'] < 0 else "↑ Slower"
                         print_and_log(f"  {data['name']} ({data['group']}): r={data['spearman_r']:.3f}, p_adj={p_adj_adj[i]:.3f} {direction}")
                 if not any_sig_adj:
@@ -1325,16 +1206,13 @@ def main():
         print_and_log("=" * 80)
         print_and_log(f"Total runtime: {format_time(total_elapsed)}")
         print_and_log(f"Key outputs saved:")
-        print_and_log(f"- Text output: dvorak9_analysis_results_with_frequency.txt")
+        print_and_log(f"- Text output: dvorak9_bigram_analysis_results.txt")
         print_and_log(f"- Comparison plots: plots/dvorak9_frequency_comparison.png")
-        print_and_log(f"- Each criterion analyzed with and without frequency control")
+        print_and_log(f"- Bigram-level analysis with and without frequency control")
         
-        if args.max_bigrams or args.max_words:
-            print_and_log(f"\nNote: Analysis used sample limits:")
-            if args.max_bigrams:
-                print_and_log(f"- Bigrams: {args.max_bigrams:,} (from {len(bigrams):,} processed)")
-            if args.max_words:
-                print_and_log(f"- Words: {args.max_words:,} (from {len(words):,} processed)")
+        if args.max_bigrams:
+            print_and_log(f"\nNote: Analysis used sample limit:")
+            print_and_log(f"- Bigrams: {args.max_bigrams:,} (from {len(bigrams):,} processed)")
         
     finally:
         if output_file:
