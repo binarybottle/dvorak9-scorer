@@ -1456,7 +1456,7 @@ def main():
     
     # Configuration
     bigram_file = "../process_3.5M_keystrokes/output/bigram_times.csv"
-    freq_file = "../process_3.5M_keystrokes/reference_data/bigram_frequencies.csv"
+    freq_file = "./input/letter_pair_frequencies_english.csv"
     middle_column_keys = {'b', 'g', 'h', 'n', 't', 'y'}
     
     # Print configuration
