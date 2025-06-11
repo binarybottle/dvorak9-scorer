@@ -264,9 +264,9 @@ def adjust_times_for_frequency(sequences, times, freq_df, sequence_type="sequenc
         frequency_residuals = []
         model_info = {
             'r_squared': model.rsquared,
-            'intercept': model.params.iloc[0],
-            'slope': model.params.iloc[1],
-            'p_value': model.pvalues.iloc[1] if len(model.pvalues) > 1 else None,
+            'intercept': model.params[0],
+            'slope': model.params[1],
+            'p_value': model.pvalues[1] if len(model.pvalues) > 1 else None,
             'n_obs': len(matched_frequencies),
             'log_frequencies': log_frequencies.copy(),  # For diagnostic plots
             'predicted_times': model.predict(X).copy(),
@@ -276,8 +276,8 @@ def adjust_times_for_frequency(sequences, times, freq_df, sequence_type="sequenc
         
         print_and_log(f"      Regression results:")
         print_and_log(f"        R² = {model.rsquared:.4f}")
-        print_and_log(f"        Slope = {model.params.iloc[1]:.4f} (p = {model.pvalues.iloc[1]:.4f})")
-        print_and_log(f"        Intercept = {model.params.iloc[0]:.4f}")
+        print_and_log(f"        Slope = {model.params[1]:.4f} (p = {model.pvalues[1]:.4f})")
+        print_and_log(f"        Intercept = {model.params[0]:.4f}")
         print_and_log(f"        → Negative slope means higher frequency = faster typing")
         
         # Calculate residuals for all sequences
@@ -288,7 +288,7 @@ def adjust_times_for_frequency(sequences, times, freq_df, sequence_type="sequenc
         for i, seq in enumerate(sequences):
             if seq in freq_dict:
                 log_freq = np.log10(freq_dict[seq])
-                predicted_time = model.params.iloc[0] + model.params.iloc[1] * log_freq
+                predicted_time = model.params[0] + model.params[1] * log_freq
                 residual = times[i] - predicted_time  # Actual - Predicted
                 frequency_residuals.append(residual)
                 residual_magnitudes.append(abs(residual))
