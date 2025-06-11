@@ -14,6 +14,7 @@ from pathlib import Path
 import random
 from scipy.stats import pearsonr, spearmanr
 from scipy import stats
+from scipy import stats as scipy_stats 
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.ensemble import RandomForestRegressor
@@ -259,23 +260,28 @@ def adjust_times_for_frequency(sequences, times, freq_df, sequence_type="sequenc
         X = sm.add_constant(log_frequencies)  # Add intercept term
         model = sm.OLS(times_array, X).fit()
         
-        # Calculate adjusted times for all sequences
-        adjusted_times = []
+        # Calculate frequency-controlled residuals for all sequences
+        frequency_residuals = []
         model_info = {
             'r_squared': model.rsquared,
             'intercept': model.params.iloc[0],
             'slope': model.params.iloc[1],
             'p_value': model.pvalues.iloc[1] if len(model.pvalues) > 1 else None,
-            'n_obs': len(matched_frequencies)
+            'n_obs': len(matched_frequencies),
+            'log_frequencies': log_frequencies.copy(),  # For diagnostic plots
+            'predicted_times': model.predict(X).copy(),
+            'actual_times': times_array.copy(),
+            'matched_sequences': matched_sequences.copy()
         }
         
         print_and_log(f"      Regression results:")
         print_and_log(f"        R² = {model.rsquared:.4f}")
         print_and_log(f"        Slope = {model.params.iloc[1]:.4f} (p = {model.pvalues.iloc[1]:.4f})")
         print_and_log(f"        Intercept = {model.params.iloc[0]:.4f}")
+        print_and_log(f"        → Negative slope means higher frequency = faster typing")
         
         # Calculate residuals for all sequences
-        adjustments = []
+        residual_magnitudes = []
         rank_changes = []
         original_ranks = stats.rankdata(times)
         
@@ -283,40 +289,246 @@ def adjust_times_for_frequency(sequences, times, freq_df, sequence_type="sequenc
             if seq in freq_dict:
                 log_freq = np.log10(freq_dict[seq])
                 predicted_time = model.params.iloc[0] + model.params.iloc[1] * log_freq
-                adjustment = times[i] - predicted_time
-                adjusted_times.append(adjustment)
-                adjustments.append(abs(times[i] - adjustment))
+                residual = times[i] - predicted_time  # Actual - Predicted
+                frequency_residuals.append(residual)
+                residual_magnitudes.append(abs(residual))
             else:
                 # For sequences without frequency data, use original time
-                adjusted_times.append(times[i])
-                adjustments.append(0)
+                # This preserves their relative ranking while noting missing frequency control
+                frequency_residuals.append(times[i])
+                residual_magnitudes.append(0)
         
-        adjusted_ranks = stats.rankdata(adjusted_times)
+        adjusted_ranks = stats.rankdata(frequency_residuals)
         rank_changes = abs(original_ranks - adjusted_ranks)
         
-        print_and_log(f"      Adjustment magnitude:")
-        print_and_log(f"        Average: {np.mean(adjustments):.2f}ms")
-        print_and_log(f"        Maximum: {np.max(adjustments):.2f}ms")
-        changed_count = sum(1 for adj in adjustments if adj > 0.1)
-        print_and_log(f"        Changed >0.1ms: {(changed_count/len(adjustments)*100):.1f}% of sequences")
+        print_and_log(f"      Frequency control effects:")
+        print_and_log(f"        Average |residual|: {np.mean(residual_magnitudes):.2f}ms")
+        print_and_log(f"        Maximum |residual|: {np.max(residual_magnitudes):.2f}ms")
+        controlled_count = sum(1 for mag in residual_magnitudes if mag > 0.1)
+        print_and_log(f"        Sequences with frequency control: {(controlled_count/len(residual_magnitudes)*100):.1f}%")
         
         # Rank order analysis
         rank_correlation = spearmanr(original_ranks, adjusted_ranks)[0]
         print_and_log(f"      📊 RANK ORDER ANALYSIS:")
-        print_and_log(f"        Correlation between raw and adjusted ranks: {rank_correlation:.6f}")
+        print_and_log(f"        Correlation between raw times and frequency residuals: {rank_correlation:.6f}")
         sequences_with_rank_changes = sum(1 for change in rank_changes if change > 0)
         print_and_log(f"        Sequences with rank changes: {sequences_with_rank_changes}/{len(sequences)} ({sequences_with_rank_changes/len(sequences)*100:.1f}%)")
         print_and_log(f"        Maximum rank position change: {int(max(rank_changes))}")
         
-        print_and_log(f"  ✅ Adjusted {sequence_type} times for frequency")
-        print_and_log(f"  💡 SUMMARY: Frequency adjustment is working, but check rank order changes above")
-        print_and_log(f"      to understand why Spearman correlations may be identical")
+        print_and_log(f"  ✅ Generated frequency-controlled residuals")
+        print_and_log(f"  💡 INTERPRETATION: Residuals represent typing speed after controlling for frequency")
+        print_and_log(f"      • Negative residuals = faster than expected given frequency")
+        print_and_log(f"      • Positive residuals = slower than expected given frequency")
         
-        return adjusted_times, model_info
+        return frequency_residuals, model_info
         
     except Exception as e:
         print_and_log(f"      ❌ Regression failed: {e}")
         return times, None
+
+def create_diagnostic_plots(model_info, output_dir='plots'):
+    """Create diagnostic plots for frequency adjustment model"""
+    if not model_info:
+        print_and_log("No model info available for diagnostic plots")
+        return
+    
+    # Create output directory
+    Path(output_dir).mkdir(exist_ok=True)
+    
+    # Create diagnostic plots
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+    fig.suptitle('Frequency Adjustment Model Diagnostics', fontsize=16, fontweight='bold')
+    
+    # Plot 1: Frequency vs Time relationship with model fit
+    log_freqs = model_info['log_frequencies']
+    actual_times = model_info['actual_times']
+    predicted_times = model_info['predicted_times']
+    
+    ax1.scatter(log_freqs, actual_times, alpha=0.5, s=20, color='skyblue', label='Actual times')
+    ax1.plot(log_freqs, predicted_times, 'r-', linewidth=2, label=f'Model fit (R² = {model_info["r_squared"]:.3f})')
+    ax1.set_xlabel('Log₁₀ Frequency')
+    ax1.set_ylabel('Typing Time (ms)')
+    ax1.set_title('Frequency vs Typing Time')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # Plot 2: Residuals vs Predicted (check for heteroscedasticity)
+    residuals = actual_times - predicted_times
+    ax2.scatter(predicted_times, residuals, alpha=0.5, s=20, color='lightcoral')
+    ax2.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+    ax2.set_xlabel('Predicted Time (ms)')
+    ax2.set_ylabel('Residuals (ms)')
+    ax2.set_title('Residuals vs Predicted')
+    ax2.grid(True, alpha=0.3)
+    
+    # Plot 3: Residuals distribution (check for normality)
+    ax3.hist(residuals, bins=50, alpha=0.7, color='lightgreen', edgecolor='black')
+    ax3.set_xlabel('Residuals (ms)')
+    ax3.set_ylabel('Frequency')
+    ax3.set_title('Distribution of Residuals')
+    ax3.grid(True, alpha=0.3)
+    
+    # Add distribution stats
+    mean_res = np.mean(residuals)
+    std_res = np.std(residuals)
+    ax3.axvline(mean_res, color='red', linestyle='--', label=f'Mean: {mean_res:.1f}ms')
+    ax3.axvline(mean_res + std_res, color='orange', linestyle='--', alpha=0.7, label=f'±1 SD: {std_res:.1f}ms')
+    ax3.axvline(mean_res - std_res, color='orange', linestyle='--', alpha=0.7)
+    ax3.legend()
+    
+    # Plot 4: Q-Q plot for normality check
+    from scipy import stats as scipy_stats
+    scipy_stats.probplot(residuals, dist="norm", plot=ax4)
+    ax4.set_title('Q-Q Plot (Normality Check)')
+    ax4.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    # Save plot
+    output_path = Path(output_dir) / 'frequency_adjustment_diagnostics.png'
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print_and_log(f"Diagnostic plots saved to: {output_path}")
+    
+    # Print diagnostic summary
+    print_and_log(f"\n📊 FREQUENCY MODEL DIAGNOSTICS:")
+    print_and_log(f"   Model fit: R² = {model_info['r_squared']:.4f}")
+    print_and_log(f"   Slope significance: p = {model_info.get('p_value', 'N/A'):.4f}")
+    print_and_log(f"   Residual statistics:")
+    print_and_log(f"     Mean: {mean_res:.2f}ms (should be ~0)")
+    print_and_log(f"     Std: {std_res:.2f}ms")
+    print_and_log(f"     Range: {min(residuals):.1f} to {max(residuals):.1f}ms")
+    
+    # Check for model assumptions
+    if abs(mean_res) < 1.0:
+        print_and_log(f"   ✅ Residuals well-centered (mean ≈ 0)")
+    else:
+        print_and_log(f"   ⚠️  Residuals not well-centered (mean = {mean_res:.2f})")
+    
+    if model_info.get('p_value', 1) < 0.05:
+        print_and_log(f"   ✅ Frequency significantly predicts typing time")
+    else:
+        print_and_log(f"   ⚠️  Frequency not significantly predictive")
+
+def create_bigram_scatter_plot(sequences, original_times, frequency_residuals, model_info=None, output_dir='plots'):
+    """Create scatter plot showing all bigrams before/after frequency adjustment"""
+    
+    # Create output directory
+    Path(output_dir).mkdir(exist_ok=True)
+    
+    # Create the plot
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 6))
+    fig.suptitle('Bigram Typing Times: Raw vs Frequency-Controlled', fontsize=16, fontweight='bold')
+    
+    # Plot 1: Original times distribution
+    ax1.hist(original_times, bins=50, alpha=0.7, color='skyblue', edgecolor='black')
+    ax1.set_xlabel('Raw Typing Time (ms)')
+    ax1.set_ylabel('Frequency')
+    ax1.set_title('Original Times Distribution')
+    ax1.grid(True, alpha=0.3)
+    
+    # Add stats
+    mean_orig = np.mean(original_times)
+    std_orig = np.std(original_times)
+    ax1.axvline(mean_orig, color='red', linestyle='--', label=f'Mean: {mean_orig:.1f}ms')
+    ax1.legend()
+    
+    # Plot 2: Frequency residuals distribution
+    ax2.hist(frequency_residuals, bins=50, alpha=0.7, color='lightcoral', edgecolor='black')
+    ax2.set_xlabel('Frequency Residuals (ms)')
+    ax2.set_ylabel('Frequency')
+    ax2.set_title('Frequency-Controlled Residuals')
+    ax2.grid(True, alpha=0.3)
+    
+    # Add stats
+    mean_res = np.mean(frequency_residuals)
+    std_res = np.std(frequency_residuals)
+    ax2.axvline(mean_res, color='red', linestyle='--', label=f'Mean: {mean_res:.1f}ms')
+    ax2.axvline(0, color='black', linestyle='-', alpha=0.5, label='Expected (0)')
+    ax2.legend()
+    
+    # Plot 3: Scatter plot Raw vs Residuals
+    # Sample if too many points for visibility
+    if len(original_times) > 5000:
+        indices = np.random.choice(len(original_times), 5000, replace=False)
+        sample_orig = [original_times[i] for i in indices]
+        sample_res = [frequency_residuals[i] for i in indices]
+        sample_seq = [sequences[i] for i in indices]
+        alpha = 0.3
+        title_suffix = f" (n={len(sample_orig):,} sample)"
+    else:
+        sample_orig = original_times
+        sample_res = frequency_residuals
+        sample_seq = sequences
+        alpha = 0.5
+        title_suffix = f" (n={len(sample_orig):,})"
+    
+    ax3.scatter(sample_orig, sample_res, alpha=alpha, s=15, color='purple')
+    ax3.set_xlabel('Raw Typing Time (ms)')
+    ax3.set_ylabel('Frequency Residuals (ms)')
+    ax3.set_title(f'Raw vs Frequency-Controlled{title_suffix}')
+    ax3.grid(True, alpha=0.3)
+    
+    # Add reference lines
+    ax3.axhline(y=0, color='black', linestyle='--', alpha=0.5, label='Zero residual')
+    
+    # Correlation between raw and residuals
+    corr = np.corrcoef(sample_orig, sample_res)[0, 1]
+    ax3.text(0.05, 0.95, f'r = {corr:.3f}', transform=ax3.transAxes, 
+             bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+    
+    # Highlight some interesting bigrams if model info available
+    if model_info and 'matched_sequences' in model_info:
+        # Find extreme residuals among matched sequences
+        matched_seqs = model_info['matched_sequences']
+        matched_times = model_info['actual_times']
+        matched_predicted = model_info['predicted_times']
+        matched_residuals = matched_times - matched_predicted
+        
+        # Find most extreme positive and negative residuals
+        max_idx = np.argmax(matched_residuals)
+        min_idx = np.argmin(matched_residuals)
+        
+        # Annotate if these are in our sample
+        for idx, seq in enumerate(sample_seq):
+            if seq == matched_seqs[max_idx]:
+                ax3.annotate(f"'{seq}' (+{matched_residuals[max_idx]:.0f}ms)", 
+                           (sample_orig[idx], sample_res[idx]),
+                           xytext=(10, 10), textcoords='offset points',
+                           bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7),
+                           fontsize=8)
+            elif seq == matched_seqs[min_idx]:
+                ax3.annotate(f"'{seq}' ({matched_residuals[min_idx]:.0f}ms)", 
+                           (sample_orig[idx], sample_res[idx]),
+                           xytext=(10, -15), textcoords='offset points',
+                           bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgreen", alpha=0.7),
+                           fontsize=8)
+    
+    ax3.legend()
+    
+    plt.tight_layout()
+    
+    # Save plot
+    output_path = Path(output_dir) / 'bigram_frequency_adjustment_scatter.png'
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print_and_log(f"Bigram scatter plot saved to: {output_path}")
+    
+    # Print summary statistics
+    print_and_log(f"\n📊 BIGRAM TIMING SUMMARY:")
+    print_and_log(f"   Raw times: {mean_orig:.1f} ± {std_orig:.1f}ms (range: {min(original_times):.1f}-{max(original_times):.1f})")
+    print_and_log(f"   Frequency residuals: {mean_res:.1f} ± {std_res:.1f}ms (range: {min(frequency_residuals):.1f}-{max(frequency_residuals):.1f})")
+    print_and_log(f"   Correlation raw vs residuals: r = {corr:.3f}")
+    
+    # Interpretation
+    if abs(corr) > 0.8:
+        print_and_log(f"   💡 High correlation suggests frequency control had minimal impact")
+    elif abs(corr) > 0.5:
+        print_and_log(f"   💡 Moderate correlation suggests frequency control modified rankings")
+    else:
+        print_and_log(f"   💡 Low correlation suggests strong frequency effects were controlled")
 
 def analyze_correlations(sequences, times, criteria_names, group_name, analysis_type, model_info=None):
     """Analyze correlations between Dvorak criteria scores and typing times"""
@@ -487,7 +699,7 @@ def analyze_correlations(sequences, times, criteria_names, group_name, analysis_
     return results
 
 def analyze_bigram_data(bigrams, freq_df, middle_column_keys):
-    """Analyze bigram typing data with middle column key analysis"""
+    """Analyze bigram typing data with middle column key analysis and diagnostics"""
     
     # Split data by middle column usage
     with_middle = []
@@ -539,8 +751,14 @@ def analyze_bigram_data(bigrams, freq_df, middle_column_keys):
         
         # Frequency-adjusted analysis
         if freq_df is not None:
-            adjusted_times, model_info = adjust_times_for_frequency(sequences, times, freq_df, "bigrams")
-            freq_results = analyze_correlations(sequences, adjusted_times, criteria_names, group_name, "freq_adjusted", model_info)
+            frequency_residuals, model_info = adjust_times_for_frequency(sequences, times, freq_df, "bigrams")
+            
+            # Create diagnostic plots for the first group only (to avoid duplication)
+            if group_name == "Bigrams (No Middle Columns)" and model_info:
+                create_diagnostic_plots(model_info)
+                create_bigram_scatter_plot(sequences, times, frequency_residuals, model_info)
+            
+            freq_results = analyze_correlations(sequences, frequency_residuals, criteria_names, group_name, "freq_adjusted", model_info)
             all_results.update(freq_results)
         else:
             print_and_log(f"  ⚠️  Skipping frequency adjustment (no frequency data)")
@@ -677,7 +895,7 @@ def create_frequency_comparison_plots(results, output_dir='plots'):
         if key.startswith('_'):
             continue
         
-        if not isinstance(data, dict) or 'spearman_r' in data:
+        if not isinstance(data, dict) or 'spearman_r' not in data:
             continue
         
         # Extract criterion and analysis type
