@@ -944,28 +944,105 @@ def interpret_correlation_results(results, analysis_name):
         print_and_log(f"     - This is typical for linguistic frequency in typing studies")
         print_and_log(f"     - Raw vs adjusted correlations show how much frequency biased results")
     
-    # Middle column analysis
-    with_middle_results = [data for key, data in results.items() if not key.startswith('_') and isinstance(data, dict) and 'with_middle' in key and data.get('spearman_p', 1) < 0.05]
-    without_middle_results = [data for key, data in results.items() if not key.startswith('_') and isinstance(data, dict) and 'no_middle' in key and data.get('spearman_p', 1) < 0.05]
+    # Middle column analysis - clear comparison of results
+    with_middle_results = [data for key, data in results.items() if not key.startswith('_') and isinstance(data, dict) and 'with_middle' in key.lower() and data.get('spearman_p', 1) < 0.05]
+    without_middle_results = [data for key, data in results.items() if not key.startswith('_') and isinstance(data, dict) and 'no_middle' in key.lower() and data.get('spearman_p', 1) < 0.05]
     
     if with_middle_results or without_middle_results:
-        print_and_log(f"\n🎯 MIDDLE COLUMN KEY ANALYSIS:")
+        print_and_log(f"\n🎯 MIDDLE COLUMN KEY IMPACT ANALYSIS:")
         print_and_log(f"   Middle column keys (T, G, B, Y, H, N) require index finger stretches.")
-        print_and_log(f"   Comparing sequences with/without these keys tests finger stretch effects:")
-        
-        if with_middle_results:
-            print_and_log(f"   WITH middle column keys ({len(with_middle_results)} significant effects):")
-            with_middle_results.sort(key=lambda x: abs(x['spearman_r']), reverse=True)
-            for data in with_middle_results:
-                direction = "supports Dvorak" if data['spearman_r'] < 0 else "contradicts Dvorak"
-                print_and_log(f"     • {data['name']}: r = {data['spearman_r']:.3f} ({direction})")
+        print_and_log(f"   This analysis compares how Dvorak criteria perform on:")
+        print_and_log(f"   • Bigrams CONTAINING middle column keys (harder finger stretches)")
+        print_and_log(f"   • Bigrams WITHOUT middle column keys (standard finger positions)")
+        print_and_log(f"   Note: This is separate from the 'columns' criterion, which measures column discipline.")
         
         if without_middle_results:
-            print_and_log(f"   WITHOUT middle column keys ({len(without_middle_results)} significant effects):")
+            print_and_log(f"\n   📋 WITHOUT MIDDLE COLUMN KEYS ({len(without_middle_results)} significant effects):")
+            print_and_log(f"      (Standard finger positions - no index finger stretches)")
             without_middle_results.sort(key=lambda x: abs(x['spearman_r']), reverse=True)
             for data in without_middle_results:
-                direction = "supports Dvorak" if data['spearman_r'] < 0 else "contradicts Dvorak"
-                print_and_log(f"     • {data['name']}: r = {data['spearman_r']:.3f} ({direction})")
+                direction = "supports Dvorak (faster)" if data['spearman_r'] < 0 else "contradicts Dvorak (slower)"
+                abs_r = abs(data['spearman_r'])
+                effect_size = "large" if abs_r >= 0.5 else "medium" if abs_r >= 0.3 else "small" if abs_r >= 0.1 else "negligible"
+                print_and_log(f"      • {data['name']}: r = {data['spearman_r']:.3f} ({effect_size} effect, {direction})")
+        
+        if with_middle_results:
+            print_and_log(f"\n   📋 WITH MIDDLE COLUMN KEYS ({len(with_middle_results)} significant effects):")
+            print_and_log(f"      (Index finger stretches required - may alter typing dynamics)")
+            with_middle_results.sort(key=lambda x: abs(x['spearman_r']), reverse=True)
+            for data in with_middle_results:
+                direction = "supports Dvorak (faster)" if data['spearman_r'] < 0 else "contradicts Dvorak (slower)"
+                abs_r = abs(data['spearman_r'])
+                effect_size = "large" if abs_r >= 0.5 else "medium" if abs_r >= 0.3 else "small" if abs_r >= 0.1 else "negligible"
+                print_and_log(f"      • {data['name']}: r = {data['spearman_r']:.3f} ({effect_size} effect, {direction})")
+        
+        # Compare patterns between groups
+        print_and_log(f"\n   🔍 MIDDLE COLUMN KEY IMPACT ON DVORAK PRINCIPLES:")
+        
+        # Find criteria that appear in both groups
+        without_criteria = {data['name']: data['spearman_r'] for data in without_middle_results}
+        with_criteria = {data['name']: data['spearman_r'] for data in with_middle_results}
+        
+        common_criteria = set(without_criteria.keys()) & set(with_criteria.keys())
+        
+        if common_criteria:
+            print_and_log(f"      Criteria significant in BOTH groups:")
+            for criterion in sorted(common_criteria):
+                without_r = without_criteria[criterion]
+                with_r = with_criteria[criterion]
+                
+                # Determine if middle columns amplify, reduce, or flip the effect
+                if (without_r < 0 and with_r < 0) or (without_r > 0 and with_r > 0):
+                    # Same direction
+                    if abs(with_r) > abs(without_r):
+                        change = "amplifies effect"
+                    elif abs(with_r) < abs(without_r):
+                        change = "reduces effect"
+                    else:
+                        change = "maintains effect"
+                else:
+                    # Opposite directions
+                    change = "REVERSES effect direction"
+                
+                print_and_log(f"        • {criterion}: without={without_r:.3f}, with={with_r:.3f} (middle keys {change})")
+        
+        # Criteria unique to each group
+        without_only = set(without_criteria.keys()) - set(with_criteria.keys())
+        with_only = set(with_criteria.keys()) - set(without_criteria.keys())
+        
+        if without_only:
+            print_and_log(f"      Criteria significant ONLY without middle keys:")
+            for criterion in sorted(without_only):
+                print_and_log(f"        • {criterion}: r = {without_criteria[criterion]:.3f}")
+        
+        if with_only:
+            print_and_log(f"      Criteria significant ONLY with middle keys:")
+            for criterion in sorted(with_only):
+                print_and_log(f"        • {criterion}: r = {with_criteria[criterion]:.3f}")
+        
+        # Summary insight
+        print_and_log(f"\n   💡 MIDDLE COLUMN KEY SUMMARY:")
+        total_support_without = sum(1 for r in without_criteria.values() if r < 0)
+        total_support_with = sum(1 for r in with_criteria.values() if r < 0)
+        
+        print_and_log(f"      • Without middle keys: {total_support_without}/{len(without_criteria)} criteria support Dvorak")
+        print_and_log(f"      • With middle keys: {total_support_with}/{len(with_criteria)} criteria support Dvorak")
+        
+        if len(common_criteria) >= 3:
+            direction_changes = sum(1 for c in common_criteria 
+                                  if (without_criteria[c] < 0) != (with_criteria[c] < 0))
+            print_and_log(f"      • Direction reversals: {direction_changes}/{len(common_criteria)} criteria flip direction")
+        
+        if total_support_with > total_support_without:
+            print_and_log(f"      → Index finger stretches may ENHANCE Dvorak principles")
+        elif total_support_with < total_support_without:
+            print_and_log(f"      → Index finger stretches may IMPAIR Dvorak principles")
+        else:
+            print_and_log(f"      → Index finger stretches have MIXED effects on Dvorak principles")
+    else:
+        print_and_log(f"\n🎯 MIDDLE COLUMN KEY ANALYSIS:")
+        print_and_log(f"   No significant differences found between sequences with/without middle column keys")
+        print_and_log(f"   This suggests index finger stretches don't substantially alter Dvorak principle effectiveness")
     
     print_and_log(f"\n🛠️  PRACTICAL IMPLICATIONS:")
     print_and_log(f"   ✅ MOSTLY SUPPORTS DVORAK:")
