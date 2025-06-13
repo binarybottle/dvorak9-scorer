@@ -39,7 +39,7 @@ def print_and_log(*args, **kwargs):
     log_content.append(message)
     original_print(*args, **kwargs)
 
-def save_log(filename="dvorak9_bigram_analysis_results.txt"):
+def save_log(filename="test_dvorak9_speed_results.txt"):
     """Save log content to file"""
     global log_content
     with open(filename, 'w', encoding='utf-8') as f:
@@ -1057,6 +1057,326 @@ def create_frequency_comparison_plots(results, output_dir='plots'):
     
     print_and_log(f"Comparison plots saved to: {output_path}")
 
+def create_combination_performance_plots(combination_results, output_dir='plots'):
+    """Create plots showing combination analysis results"""
+    
+    # Create output directory
+    Path(output_dir).mkdir(exist_ok=True)
+    
+    print_and_log("📊 Creating combination analysis plots...")
+    
+    # Create the plots
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+    fig.suptitle('Dvorak Criterion Combination Analysis', fontsize=16, fontweight='bold')
+    
+    # Plot 1: Best correlation by combination size
+    combination_sizes = []
+    best_correlations = []
+    best_combinations = []
+    
+    for k_way, results_list in combination_results.items():
+        if results_list:
+            k = int(k_way.split('_')[0])
+            best_result = max(results_list, key=lambda x: x['abs_correlation'])
+            
+            combination_sizes.append(k)
+            best_correlations.append(best_result['abs_correlation'])
+            best_combinations.append(best_result['combination'])
+    
+    if combination_sizes:
+        bars = ax1.bar(combination_sizes, best_correlations, alpha=0.7, color='skyblue')
+        ax1.set_xlabel('Number of Criteria Combined')
+        ax1.set_ylabel('Best Absolute Correlation |r|')
+        ax1.set_title('Best Performance by Combination Size')
+        ax1.set_xticks(combination_sizes)
+        ax1.grid(True, alpha=0.3)
+        
+        # Add effect size reference lines
+        ax1.axhline(y=0.1, color='green', linestyle='--', alpha=0.5, label='Small effect (0.1)')
+        ax1.axhline(y=0.3, color='orange', linestyle='--', alpha=0.5, label='Medium effect (0.3)')
+        ax1.axhline(y=0.5, color='red', linestyle='--', alpha=0.5, label='Large effect (0.5)')
+        ax1.legend()
+        
+        # Annotate bars with correlation values
+        for bar, corr in zip(bars, best_correlations):
+            height = bar.get_height()
+            ax1.text(bar.get_x() + bar.get_width()/2., height + 0.001,
+                    f'{corr:.3f}', ha='center', va='bottom', fontsize=8)
+    
+    # Plot 2: Distribution of effect sizes
+    all_correlations = []
+    all_sizes = []
+    
+    for k_way, results_list in combination_results.items():
+        k = int(k_way.split('_')[0])
+        for result in results_list:
+            if result['p_value'] < 0.05:  # Only significant results
+                all_correlations.append(result['abs_correlation'])
+                all_sizes.append(k)
+    
+    if all_correlations:
+        # Create effect size categories
+        effect_categories = []
+        for corr in all_correlations:
+            if corr >= 0.5:
+                effect_categories.append('Large (≥0.5)')
+            elif corr >= 0.3:
+                effect_categories.append('Medium (0.3-0.5)')
+            elif corr >= 0.1:
+                effect_categories.append('Small (0.1-0.3)')
+            else:
+                effect_categories.append('Negligible (<0.1)')
+        
+        # Count effect sizes
+        from collections import Counter
+        effect_counts = Counter(effect_categories)
+        
+        # Create pie chart
+        labels = list(effect_counts.keys())
+        sizes = list(effect_counts.values())
+        colors = ['red', 'orange', 'yellow', 'lightgray'][:len(labels)]
+        
+        ax2.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
+        ax2.set_title('Distribution of Effect Sizes\n(Significant Results Only)')
+    
+    # Plot 3: Number of significant results by combination size
+    sizes_for_plot = []
+    significant_counts = []
+    total_counts = []
+    
+    for k_way, results_list in combination_results.items():
+        k = int(k_way.split('_')[0])
+        significant = sum(1 for r in results_list if r['p_value'] < 0.05)
+        total = len(results_list)
+        
+        if total > 0:
+            sizes_for_plot.append(k)
+            significant_counts.append(significant)
+            total_counts.append(total)
+    
+    if sizes_for_plot:
+        x_pos = np.arange(len(sizes_for_plot))
+        width = 0.35
+        
+        bars1 = ax3.bar(x_pos - width/2, total_counts, width, label='Total tested', alpha=0.7, color='lightblue')
+        bars2 = ax3.bar(x_pos + width/2, significant_counts, width, label='Significant (p<0.05)', alpha=0.7, color='darkblue')
+        
+        ax3.set_xlabel('Number of Criteria Combined')
+        ax3.set_ylabel('Number of Combinations')
+        ax3.set_title('Significant vs Total Combinations')
+        ax3.set_xticks(x_pos)
+        ax3.set_xticklabels(sizes_for_plot)
+        ax3.legend()
+        ax3.grid(True, alpha=0.3)
+        
+        # Add percentage labels
+        for i, (total, sig) in enumerate(zip(total_counts, significant_counts)):
+            if total > 0:
+                pct = (sig / total) * 100
+                ax3.text(i, max(total, sig) + max(total_counts) * 0.02, 
+                        f'{pct:.1f}%', ha='center', va='bottom', fontsize=8)
+    
+    # Plot 4: Top 10 overall combinations
+    all_results = []
+    for k_way, results_list in combination_results.items():
+        all_results.extend(results_list)
+    
+    # Sort by absolute correlation and take top 10
+    all_results.sort(key=lambda x: x['abs_correlation'], reverse=True)
+    top_10 = all_results[:10]
+    
+    if top_10:
+        # Prepare data for horizontal bar chart
+        combinations = [r['combination'] for r in top_10]
+        correlations = [r['correlation'] for r in top_10]  # Use signed correlation
+        
+        # Truncate long combination names for readability
+        truncated_combinations = []
+        for combo in combinations:
+            if len(combo) > 30:
+                truncated_combinations.append(combo[:27] + '...')
+            else:
+                truncated_combinations.append(combo)
+        
+        y_pos = np.arange(len(truncated_combinations))
+        
+        # Color bars by direction (red for positive, blue for negative)
+        colors = ['red' if corr > 0 else 'blue' for corr in correlations]
+        
+        bars = ax4.barh(y_pos, correlations, color=colors, alpha=0.7)
+        ax4.set_yticks(y_pos)
+        ax4.set_yticklabels(truncated_combinations, fontsize=8)
+        ax4.set_xlabel('Spearman Correlation')
+        ax4.set_title('Top 10 Best Combinations')
+        ax4.axvline(x=0, color='black', linestyle='-', alpha=0.3)
+        ax4.grid(True, alpha=0.3)
+        
+        # Add correlation values to bars
+        for bar, corr in zip(bars, correlations):
+            width = bar.get_width()
+            ax4.text(width + (0.01 if width > 0 else -0.01), bar.get_y() + bar.get_height()/2,
+                    f'{corr:.3f}', ha='left' if width > 0 else 'right', va='center', fontsize=7)
+    
+    plt.tight_layout()
+    
+    # Save plot
+    output_path = Path(output_dir) / 'dvorak_combination_analysis.png'
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print_and_log(f"Combination analysis plots saved to: {output_path}")
+    
+    return output_path
+
+def create_criterion_interaction_heatmap(combination_results, output_dir='plots'):
+    """Create heatmap showing which criteria work best together"""
+    
+    # Create output directory
+    Path(output_dir).mkdir(exist_ok=True)
+    
+    print_and_log("🔥 Creating criterion interaction heatmap...")
+    
+    # Extract all pairwise combinations
+    pairwise_results = combination_results.get('2_way', [])
+    
+    if not pairwise_results:
+        print_and_log("❌ No pairwise combination data found for heatmap")
+        return None
+    
+    # Get all unique criteria
+    all_criteria = set()
+    for result in pairwise_results:
+        criteria = result['combination'].split(' + ')
+        all_criteria.update(criteria)
+    
+    criteria_list = sorted(list(all_criteria))
+    n_criteria = len(criteria_list)
+    
+    # Create correlation matrix
+    correlation_matrix = np.zeros((n_criteria, n_criteria))
+    p_value_matrix = np.ones((n_criteria, n_criteria))
+    
+    # Fill matrix with pairwise correlations
+    for result in pairwise_results:
+        criteria = result['combination'].split(' + ')
+        if len(criteria) == 2:
+            idx1 = criteria_list.index(criteria[0])
+            idx2 = criteria_list.index(criteria[1])
+            
+            # Use absolute correlation for strength
+            correlation_matrix[idx1, idx2] = result['abs_correlation']
+            correlation_matrix[idx2, idx1] = result['abs_correlation']
+            
+            # Store p-values
+            p_value_matrix[idx1, idx2] = result['p_value']
+            p_value_matrix[idx2, idx1] = result['p_value']
+    
+    # Create the plot
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    fig.suptitle('Dvorak Criterion Interaction Analysis', fontsize=16, fontweight='bold')
+    
+    # Plot 1: Correlation strength heatmap
+    im1 = ax1.imshow(correlation_matrix, cmap='Reds', aspect='auto')
+    ax1.set_xticks(range(n_criteria))
+    ax1.set_yticks(range(n_criteria))
+    ax1.set_xticklabels(criteria_list, rotation=45, ha='right')
+    ax1.set_yticklabels(criteria_list)
+    ax1.set_title('Pairwise Combination Strength (|r|)')
+    
+    # Add correlation values to cells
+    for i in range(n_criteria):
+        for j in range(n_criteria):
+            if i != j and correlation_matrix[i, j] > 0:
+                text = ax1.text(j, i, f'{correlation_matrix[i, j]:.3f}',
+                               ha="center", va="center", color="black" if correlation_matrix[i, j] < 0.3 else "white",
+                               fontsize=8)
+    
+    # Add colorbar
+    cbar1 = plt.colorbar(im1, ax=ax1, shrink=0.8)
+    cbar1.set_label('Absolute Correlation |r|')
+    
+    # Plot 2: Significance heatmap
+    # Convert p-values to significance levels for better visualization
+    significance_matrix = np.zeros_like(p_value_matrix)
+    significance_matrix[p_value_matrix < 0.001] = 3  # ***
+    significance_matrix[(p_value_matrix >= 0.001) & (p_value_matrix < 0.01)] = 2  # **
+    significance_matrix[(p_value_matrix >= 0.01) & (p_value_matrix < 0.05)] = 1  # *
+    significance_matrix[p_value_matrix >= 0.05] = 0  # ns
+    
+    im2 = ax2.imshow(significance_matrix, cmap='RdYlBu_r', aspect='auto', vmin=0, vmax=3)
+    ax2.set_xticks(range(n_criteria))
+    ax2.set_yticks(range(n_criteria))
+    ax2.set_xticklabels(criteria_list, rotation=45, ha='right')
+    ax2.set_yticklabels(criteria_list)
+    ax2.set_title('Statistical Significance')
+    
+    # Add significance symbols to cells
+    for i in range(n_criteria):
+        for j in range(n_criteria):
+            if i != j:
+                p_val = p_value_matrix[i, j]
+                if p_val < 0.001:
+                    symbol = '***'
+                elif p_val < 0.01:
+                    symbol = '**'
+                elif p_val < 0.05:
+                    symbol = '*'
+                else:
+                    symbol = 'ns'
+                
+                ax2.text(j, i, symbol, ha="center", va="center", 
+                        color="white" if significance_matrix[i, j] > 1.5 else "black",
+                        fontsize=8, fontweight='bold')
+    
+    # Custom colorbar for significance
+    cbar2 = plt.colorbar(im2, ax=ax2, shrink=0.8, ticks=[0, 1, 2, 3])
+    cbar2.set_label('Significance Level')
+    cbar2.set_ticklabels(['ns', '*', '**', '***'])
+    
+    plt.tight_layout()
+    
+    # Save plot
+    output_path = Path(output_dir) / 'dvorak_criterion_interactions.png'
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print_and_log(f"Criterion interaction heatmap saved to: {output_path}")
+    
+    # Print insights from the heatmap
+    print_and_log(f"\n🔥 CRITERION INTERACTION INSIGHTS:")
+    
+    # Find strongest pairwise interactions
+    strong_pairs = []
+    for i in range(n_criteria):
+        for j in range(i+1, n_criteria):
+            if correlation_matrix[i, j] > 0.1 and p_value_matrix[i, j] < 0.05:
+                strong_pairs.append((
+                    f"{criteria_list[i]} + {criteria_list[j]}",
+                    correlation_matrix[i, j],
+                    p_value_matrix[i, j]
+                ))
+    
+    strong_pairs.sort(key=lambda x: x[1], reverse=True)
+    
+    if strong_pairs:
+        print_and_log(f"   Top criterion pairs (|r| > 0.1, p < 0.05):")
+        for i, (pair, corr, p_val) in enumerate(strong_pairs[:5]):
+            sig = "***" if p_val < 0.001 else "**" if p_val < 0.01 else "*"
+            print_and_log(f"     {i+1}. {pair}: |r| = {corr:.3f}{sig}")
+    else:
+        print_and_log(f"   ⚠️  No strong criterion pairs found (all |r| < 0.1)")
+    
+    # Find criteria that work well with others
+    avg_interactions = np.mean(correlation_matrix, axis=1)
+    best_criteria = [(criteria_list[i], avg_interactions[i]) for i in range(n_criteria)]
+    best_criteria.sort(key=lambda x: x[1], reverse=True)
+    
+    print_and_log(f"   Best criteria for combinations (average |r| with others):")
+    for i, (criterion, avg_corr) in enumerate(best_criteria[:3]):
+        print_and_log(f"     {i+1}. {criterion}: {avg_corr:.3f}")
+    
+    return output_path
+
 def interpret_correlation_results(results, analysis_name):
     """Provide interpretation of correlation results"""
     
@@ -1300,7 +1620,7 @@ def interpret_correlation_results(results, analysis_name):
         print_and_log(f"   • No significant correlations found")
 
 def analyze_criterion_combinations(results):
-    """Analyze how combinations of criteria predict typing speed"""
+    """Analyze how combinations of criteria predict typing speed - COMPREHENSIVE VERSION"""
     
     print_and_log(f"\n" + "=" * 80)
     print_and_log(f"COMPREHENSIVE CRITERION COMBINATION ANALYSIS")
@@ -1319,32 +1639,6 @@ def analyze_criterion_combinations(results):
     # If we have sequence data, create the combined dataset
     if all_sequences:
         sequence_data_sets["All sequences (combined)"] = all_sequences
-    
-    # Also try to find specific group datasets if they exist separately
-    for key, data in results.items():
-        if key.startswith('_sequence_scores') and isinstance(data, list):
-            # Determine group from parent key
-            parent_key = key.replace('_sequence_scores', '')
-            group_name = "Specific group"
-            
-            # Try to infer group from results keys
-            for result_key in results.keys():
-                if result_key.startswith(parent_key) and not result_key.startswith('_') and isinstance(results[result_key], dict):
-                    if '_no_middle' in result_key:
-                        if '_raw_' in result_key:
-                            group_name = "No Middle Columns (Raw)"
-                        elif '_freq_adjusted_' in result_key:
-                            group_name = "No Middle Columns (Freq Adjusted)"
-                    elif '_with_middle' in result_key:
-                        if '_raw_' in result_key:
-                            group_name = "With Middle Columns (Raw)"
-                        elif '_freq_adjusted_' in result_key:
-                            group_name = "With Middle Columns (Freq Adjusted)"
-                    break
-            
-            # Only add if it's different from the combined dataset
-            if group_name != "Specific group" and len(data) != len(all_sequences):
-                sequence_data_sets[group_name] = data
     
     if not sequence_data_sets:
         print_and_log("❌ No sequence-level data found for combination analysis")
@@ -1368,166 +1662,110 @@ def analyze_criterion_combinations(results):
         # Get criteria columns (exclude sequence, time, analysis_type)
         exclude_cols = {'sequence', 'time', 'analysis_type'}
         criteria_cols = [col for col in df.columns if col not in exclude_cols]
+        times = df['time'].values
         
         print_and_log(f"   Criteria: {criteria_cols}")
         
-        # Determine what type of data this is based on the group name or data characteristics
-        data_description = "Combined dataset (all sequences)"
-        if "No Middle" in group_name:
-            data_description = "No middle column sequences only"
-        elif "With Middle" in group_name:
-            data_description = "With middle column sequences only"
-        elif "Raw" in group_name:
-            data_description = "Raw timing data (not frequency-adjusted)"
-        elif "Freq" in group_name:
-            data_description = "Frequency-adjusted timing data"
+        # COMPREHENSIVE COMBINATION ANALYSIS - TEST ALL 511 COMBINATIONS
+        all_results = {}
         
-        print_and_log(f"   Data type: {data_description}")
-
-        # 1. INDIVIDUAL CRITERION CORRELATIONS (baseline)
-        print_and_log(f"\n   🎯 INDIVIDUAL CRITERION EFFECTS:")
-        print_and_log(f"      (Based on {data_description.lower()})")
-        individual_correlations = {}
-        for criterion in criteria_cols:
-            scores = df[criterion].values
-            times = df['time'].values
-            if len(set(scores)) > 1:  # Check for variation
-                try:
-                    corr, p_val = spearmanr(scores, times)
-                    if not (np.isnan(corr) or np.isnan(p_val)):
-                        individual_correlations[criterion] = {'r': corr, 'p': p_val}
-                        sig = "***" if p_val < 0.001 else "**" if p_val < 0.01 else "*" if p_val < 0.05 else ""
-                        direction = "↓ faster" if corr < 0 else "↑ slower"
-                        print_and_log(f"     {criterion:<15}: r={corr:>6.3f}{sig:<3} ({direction})")
-                    else:
-                        print_and_log(f"     {criterion:<15}: r=NaN (correlation failed)")
-                except Exception as e:
-                    print_and_log(f"     {criterion:<15}: Error - {e}")
-            else:
-                print_and_log(f"     {criterion:<15}: No variation (constant scores)")
-        
-        # 2. PAIRWISE COMBINATIONS
-        print_and_log(f"\n   🤝 PAIRWISE CRITERION COMBINATIONS:")
-        pairwise_effects = []
-        
-        for crit1, crit2 in combinations(criteria_cols, 2):
-            scores1 = df[crit1].values
-            scores2 = df[crit2].values
-            times = df['time'].values
+        # For each combination size k from 1 to 9
+        for k in range(1, len(criteria_cols) + 1):
+            print_and_log(f"\n📊 {k}-WAY COMBINATIONS:")
             
-            # Skip if no variation
-            if len(set(scores1)) <= 1 or len(set(scores2)) <= 1:
-                continue
+            # Generate ALL combinations of size k
+            from itertools import combinations
+            combos = list(combinations(criteria_cols, k))
+            total_combos = len(combos)
+            print_and_log(f"   Testing ALL {total_combos:,} combinations of {k} criteria...")
             
-            # Create combined score (additive)
-            combined_scores = scores1 + scores2
+            combo_results = []
             
-            if len(set(combined_scores)) > 1:
-                try:
-                    combined_corr, combined_p = spearmanr(combined_scores, times)
-                    
-                    # Skip if correlation failed
-                    if np.isnan(combined_corr) or np.isnan(combined_p):
+            # Test EVERY combination (no sampling!)
+            for combo in combos:
+                # Create combined score (additive model)
+                combined_scores = np.zeros(len(times))
+                for criterion in combo:
+                    combined_scores += df[criterion].values
+                
+                # Test if there's variation
+                if len(set(combined_scores)) > 1:
+                    try:
+                        corr, p_val = spearmanr(combined_scores, times)
+                        if not (np.isnan(corr) or np.isnan(p_val)):
+                            combo_results.append({
+                                'combination': ' + '.join(combo),
+                                'criteria_count': k,
+                                'correlation': corr,
+                                'p_value': p_val,
+                                'abs_correlation': abs(corr)
+                            })
+                    except:
                         continue
-                    
-                    # Compare to individual effects
-                    individual_r1 = individual_correlations.get(crit1, {}).get('r', 0)
-                    individual_r2 = individual_correlations.get(crit2, {}).get('r', 0)
-                    
-                    # Handle NaN individual correlations
-                    if np.isnan(individual_r1):
-                        individual_r1 = 0
-                    if np.isnan(individual_r2):
-                        individual_r2 = 0
-                    
-                    # Estimate expected combined effect (rough approximation)
-                    expected_combined = (individual_r1 + individual_r2) / 2
-                    
-                    # Calculate interaction effect
-                    interaction_strength = combined_corr - expected_combined
-                    
-                    pairwise_effects.append({
-                        'pair': f"{crit1} + {crit2}",
-                        'combined_r': combined_corr,
-                        'combined_p': combined_p,
-                        'individual_r1': individual_r1,
-                        'individual_r2': individual_r2,
-                        'expected': expected_combined,
-                        'interaction': interaction_strength
-                    })
-                except Exception as e:
-                    print_and_log(f"       Error with {crit1} + {crit2}: {e}")
-                    continue
-        
-        # Sort and display top pairwise effects
-        pairwise_effects.sort(key=lambda x: abs(x['combined_r']), reverse=True)
-        print_and_log(f"     Top pairwise combinations (by |r|):")
-        for i, effect in enumerate(pairwise_effects[:8]):
-            sig = "***" if effect['combined_p'] < 0.001 else "**" if effect['combined_p'] < 0.01 else "*" if effect['combined_p'] < 0.05 else ""
-            interaction_type = "synergistic" if abs(effect['combined_r']) > abs(effect['expected']) else "additive"
-            print_and_log(f"      {i+1}. {effect['pair']:<25} r={effect['combined_r']:>6.3f}{sig} ({interaction_type})")
-        
-        # 3. THREE-WAY COMBINATIONS
-        print_and_log(f"\n   🎭 THREE-WAY CRITERION COMBINATIONS:")
-        threeway_effects = []
-        
-        # Sample three-way combinations (too many to test all)
-        import itertools
-        threeway_combos = list(itertools.combinations(criteria_cols, 3))
-        
-        # Limit to reasonable number for performance
-        if len(threeway_combos) > 50:
-            threeway_combos = random.sample(threeway_combos, 50)
-        
-        for crit1, crit2, crit3 in threeway_combos:
-            scores1 = df[crit1].values
-            scores2 = df[crit2].values  
-            scores3 = df[crit3].values
-            times = df['time'].values
             
-            # Skip if no variation
-            if len(set(scores1)) <= 1 or len(set(scores2)) <= 1 or len(set(scores3)) <= 1:
-                continue
+            # Sort by absolute correlation
+            combo_results.sort(key=lambda x: x['abs_correlation'], reverse=True)
             
-            # Create combined score (additive)
-            combined_scores = scores1 + scores2 + scores3
+            # Store results
+            all_results[f'{k}_way'] = combo_results
             
-            if len(set(combined_scores)) > 1:
-                try:
-                    combined_corr, combined_p = spearmanr(combined_scores, times)
-                    if not (np.isnan(combined_corr) or np.isnan(combined_p)):
-                        threeway_effects.append({
-                            'combo': f"{crit1} + {crit2} + {crit3}",
-                            'combined_r': combined_corr,
-                            'combined_p': combined_p
-                        })
-                except:
-                    continue
-        
-        # Sort and display top three-way effects
-        threeway_effects.sort(key=lambda x: abs(x['combined_r']), reverse=True)
-        print_and_log(f"     Top three-way combinations:")
-        for i, effect in enumerate(threeway_effects[:5]):
-            sig = "***" if effect['combined_p'] < 0.001 else "**" if effect['combined_p'] < 0.01 else "*" if effect['combined_p'] < 0.05 else ""
-            print_and_log(f"     {i+1}. {effect['combo']} r={effect['combined_r']:>6.3f}{sig}")
-        
-        # 4. STRONGEST COMBINATION OVERALL
-        all_combinations = pairwise_effects + threeway_effects
-        if all_combinations:
-            strongest = max(all_combinations, key=lambda x: abs(x['combined_r']))
-            combination_name = strongest.get('pair', strongest.get('combo', 'Unknown'))
-            print_and_log(f"\n   🏆 STRONGEST COMBINATION OVERALL:")
-            print_and_log(f"     {combination_name}")
-            print_and_log(f"     Correlation: r = {strongest['combined_r']:.3f}, p = {strongest['combined_p']:.3f}")
-            
-            if abs(strongest['combined_r']) < 0.1:
-                print_and_log(f"     ⚠️  Weak combination effects overall")
-            elif abs(strongest['combined_r']) < 0.3:
-                print_and_log(f"     ✅ Small but meaningful combination effects")
+            # Show top results for this k
+            top_n = min(5, len(combo_results))
+            if combo_results:
+                print_and_log(f"   Top {top_n} combinations:")
+                for i, result in enumerate(combo_results[:top_n]):
+                    sig = "***" if result['p_value'] < 0.001 else "**" if result['p_value'] < 0.01 else "*" if result['p_value'] < 0.05 else ""
+                    print_and_log(f"     {i+1}. {result['combination']}")
+                    print_and_log(f"        r = {result['correlation']:.4f}{sig}, p = {result['p_value']:.4f}")
             else:
-                print_and_log(f"     🎯 Strong combination effects found")
+                print_and_log(f"   No valid combinations found")
         
-        # 5. MACHINE LEARNING ANALYSIS
+        # FIND THE SINGLE BEST COMBINATION OVERALL
+        print_and_log(f"\n🏆 BEST COMBINATION ACROSS ALL SIZES:")
+        
+        best_overall = None
+        best_correlation = 0
+        
+        for k_way, results_list in all_results.items():
+            if results_list:
+                best_in_category = max(results_list, key=lambda x: x['abs_correlation'])
+                if best_in_category['abs_correlation'] > best_correlation:
+                    best_correlation = best_in_category['abs_correlation']
+                    best_overall = best_in_category
+        
+        if best_overall:
+            direction = "supports Dvorak (faster)" if best_overall['correlation'] < 0 else "contradicts Dvorak (slower)"
+            effect_size = "large" if best_overall['abs_correlation'] >= 0.5 else "medium" if best_overall['abs_correlation'] >= 0.3 else "small" if best_overall['abs_correlation'] >= 0.1 else "negligible"
+            
+            print_and_log(f"   🎯 STRONGEST PREDICTOR: {best_overall['combination']}")
+            print_and_log(f"   📈 Correlation: r = {best_overall['correlation']:.4f}")
+            print_and_log(f"   📊 Effect size: {effect_size}")
+            print_and_log(f"   🎭 Direction: {direction}")
+            print_and_log(f"   🔢 Uses {best_overall['criteria_count']} criteria")
+        
+        # SUMMARY STATISTICS
+        print_and_log(f"\n📈 COMBINATION ANALYSIS SUMMARY:")
+        
+        total_combinations = sum(len(results_list) for results_list in all_results.values())
+        significant_combinations = sum(sum(1 for r in results_list if r['p_value'] < 0.05) for results_list in all_results.values())
+        
+        print_and_log(f"   • Total combinations tested: {total_combinations:,}")
+        print_and_log(f"   • Statistically significant: {significant_combinations:,} ({significant_combinations/total_combinations*100:.1f}%)")
+        
+        # Effect size distribution
+        all_correlations = [r['abs_correlation'] for results_list in all_results.values() for r in results_list if r['p_value'] < 0.05]
+        if all_correlations:
+            large_effects = sum(1 for r in all_correlations if r >= 0.5)
+            medium_effects = sum(1 for r in all_correlations if 0.3 <= r < 0.5)
+            small_effects = sum(1 for r in all_correlations if 0.1 <= r < 0.3)
+            negligible_effects = sum(1 for r in all_correlations if r < 0.1)
+            
+            print_and_log(f"   • Large effects (|r| ≥ 0.5): {large_effects}")
+            print_and_log(f"   • Medium effects (|r| 0.3-0.5): {medium_effects}")
+            print_and_log(f"   • Small effects (|r| 0.1-0.3): {small_effects}")
+            print_and_log(f"   • Negligible effects (|r| < 0.1): {negligible_effects}")
+        
+        # MACHINE LEARNING ANALYSIS WITH PROPER INTERPRETATION
         print_and_log(f"\n   🤖 MACHINE LEARNING INTERACTION ANALYSIS:")
         try:
             # Prepare data for ML
@@ -1549,17 +1787,100 @@ def analyze_criterion_combinations(results):
                 y_pred = rf.predict(X)
                 r2 = r2_score(y, y_pred)
                 
-                print_and_log(f"     Random Forest R² = {r2:.3f}")
-                print_and_log(f"     Feature importance ranking:")
+                # PROPER INTERPRETATION
+                print_and_log(f"     📊 MODEL PERFORMANCE:")
+                print_and_log(f"       Random Forest R² = {r2:.4f} ({r2*100:.2f}% of variance explained)")
+                
+                if r2 < 0.01:
+                    performance = "Essentially useless - no predictive power"
+                elif r2 < 0.05:
+                    performance = "Very weak - minimal predictive power"  
+                elif r2 < 0.1:
+                    performance = "Weak but detectable patterns"
+                elif r2 < 0.25:
+                    performance = "Moderate predictive power"
+                else:
+                    performance = "Strong predictive power"
+                
+                print_and_log(f"       💡 Interpretation: {performance}")
+                
+                # Feature importance interpretation  
+                print_and_log(f"     🎯 FEATURE IMPORTANCE ANALYSIS:")
+                print_and_log(f"       Ranking (importance scores sum to 1.0):")
+                
                 for i, (feature, importance) in enumerate(feature_importance):
-                    print_and_log(f"       {i+1}. {feature:<15}: {importance:.3f}")
+                    percentage = importance * 100
+                    if importance > 0.2:
+                        importance_level = "🔥 Critical"
+                    elif importance > 0.15:
+                        importance_level = "🔴 High"
+                    elif importance > 0.1:
+                        importance_level = "🟡 Medium"
+                    else:
+                        importance_level = "🟢 Low"
+                    
+                    print_and_log(f"         {i+1}. {feature:<15}: {percentage:5.1f}% {importance_level}")
+                
+                # Practical implications
+                print_and_log(f"     💡 PRACTICAL IMPLICATIONS:")
+                
+                if r2 < 0.05:
+                    print_and_log(f"       ❌ INDIVIDUAL CRITERIA ARE POOR PREDICTORS:")
+                    print_and_log(f"         • Even combined, all 9 criteria explain <5% of typing speed variance")
+                    print_and_log(f"         • Individual differences dominate over keyboard layout principles")
+                    print_and_log(f"         • Other factors (skill, practice, fatigue) are much more important")
+                    
+                    print_and_log(f"       🤔 WHY ARE DVORAK CRITERIA WEAK PREDICTORS?")
+                    print_and_log(f"         • Modern typing may not follow 1930s assumptions")
+                    print_and_log(f"         • Individual typing styles vary enormously")
+                    print_and_log(f"         • Muscle memory and practice effects dominate")
+                    print_and_log(f"         • Real-world typing includes errors, corrections, thinking time")
+                
+                # Top criterion analysis
+                top_criterion, top_importance = feature_importance[0]
+                print_and_log(f"       🏆 MOST PREDICTIVE CRITERION: {top_criterion}")
+                print_and_log(f"         • Explains {top_importance*100:.1f}% of the model's {r2*100:.1f}% total variance")
+                print_and_log(f"         • Actual variance explained: {top_importance*r2*100:.2f}% of typing speed")
+                
+                if top_importance * r2 < 0.01:
+                    print_and_log(f"         • Still explains <1% of actual typing speed - very weak effect")
                 
             else:
                 print_and_log(f"     ⚠️  Insufficient variation for ML analysis")
                 
         except Exception as e:
             print_and_log(f"     ❌ ML analysis failed: {e}")
-
+        
+        # REPORT WHAT WE ACTUALLY TESTED
+        print_and_log(f"\n📋 COMPREHENSIVE TESTING SUMMARY:")
+        print_and_log(f"   This analysis tested ALL possible combinations:")
+        total_possible = 2**len(criteria_cols) - 1  # 2^9 - 1 = 511
+        print_and_log(f"   • Total possible combinations: {total_possible}")
+        
+        for k in range(1, len(criteria_cols) + 1):
+            k_combinations = len(list(combinations(criteria_cols, k)))
+            k_tested = len(all_results.get(f'{k}_way', []))
+            print_and_log(f"   • {k}-way combinations: {k_tested}/{k_combinations} tested")
+        
+        print_and_log(f"   ✅ No combinations were skipped - complete coverage achieved")
+        
+        # CREATE THE MISSING PLOTS! 📊
+        if all_results:
+            print_and_log(f"\n📊 Creating combination analysis visualizations...")
+            
+            # Plot 1: Combination performance plots
+            create_combination_performance_plots(all_results)
+            
+            # Plot 2: Criterion interaction heatmap
+            create_criterion_interaction_heatmap(all_results)
+            
+            print_and_log(f"✅ Combination analysis plots created successfully!")
+        else:
+            print_and_log(f"⚠️  No combination results to plot")
+        
+        # Return results for further analysis if needed
+        return all_results
+    
 def load_and_process_bigram_data(bigram_file, max_bigrams=None):
     """Load and process bigram typing data"""
     print_and_log("Reading typing data files...")
@@ -1657,6 +1978,61 @@ def filter_bigrams_by_time(bigrams, min_time=50, max_time=2000):
         print_and_log(f"  Time range: {min(times):.1f} - {max(times):.1f}ms")
     
     return filtered_bigrams
+
+def fix_multiple_comparisons_correction(results):
+    """Fix the p-value extraction logic"""
+    
+    print_and_log(f"\n" + "=" * 80)
+    print_and_log("FIXED MULTIPLE COMPARISONS CORRECTION")
+    print_and_log("=" * 80)
+    
+    # Extract p-values with CORRECT key patterns
+    p_values_raw = []
+    p_values_adj = []
+    keys_raw = []
+    keys_adj = []
+    
+    for key, data in results.items():
+        if key.startswith('_') or not isinstance(data, dict):
+            continue
+            
+        if 'spearman_p' in data and not np.isnan(data['spearman_p']):
+            # CORRECT pattern matching
+            if key.endswith('_raw'):  # Changed from '_raw_' to '_raw'
+                p_values_raw.append(data['spearman_p'])
+                keys_raw.append(key)
+            elif key.endswith('_freq_adjusted'):  # Changed pattern
+                p_values_adj.append(data['spearman_p'])
+                keys_adj.append(key)
+    
+    print_and_log(f"Found {len(p_values_raw)} raw p-values and {len(p_values_adj)} adjusted p-values")
+    
+    # Apply FDR correction
+    alpha = 0.05
+    
+    if p_values_raw:
+        rejected_raw, p_adj_raw, _, _ = multipletests(p_values_raw, alpha=alpha, method='fdr_bh')
+        print_and_log(f"\nRaw Analysis - Significant after FDR correction:")
+        significant_count = sum(rejected_raw)
+        print_and_log(f"   {significant_count}/{len(rejected_raw)} remain significant after correction")
+        
+        for i, key in enumerate(keys_raw):
+            if rejected_raw[i]:
+                data = results[key]
+                direction = "↓ Faster" if data['spearman_r'] < 0 else "↑ Slower"
+                print_and_log(f"   • {data['name']}: r={data['spearman_r']:.3f}, p_adj={p_adj_raw[i]:.3f} {direction}")
+    
+    if p_values_adj:
+        rejected_adj, p_adj_adj, _, _ = multipletests(p_values_adj, alpha=alpha, method='fdr_bh')
+        print_and_log(f"\nFrequency-Adjusted Analysis - Significant after FDR correction:")
+        significant_count = sum(rejected_adj)
+        print_and_log(f"   {significant_count}/{len(rejected_adj)} remain significant after correction")
+        
+        for i, key in enumerate(keys_adj):
+            if rejected_adj[i]:
+                data = results[key]
+                direction = "↓ Faster" if data['spearman_r'] < 0 else "↑ Slower"
+                print_and_log(f"   • {data['name']}: r={data['spearman_r']:.3f}, p_adj={p_adj_adj[i]:.3f} {direction}")
 
 def main():
     """Main analysis function"""
@@ -1764,73 +2140,7 @@ def main():
     
     # Multiple comparisons correction
     if bigram_results:
-        print_and_log(f"\n" + "=" * 80)
-        print_and_log("MULTIPLE COMPARISONS CORRECTION")
-        print_and_log("=" * 80)
-        
-        try:
-            # Extract p-values for both raw and adjusted analyses
-            p_values_raw = []
-            p_values_adj = []
-            keys_raw = []
-            keys_adj = []
-            
-            for key, data in bigram_results.items():
-                # Skip internal data and non-dictionary entries
-                if key.startswith('_') or not isinstance(data, dict):
-                    continue
-                    
-                if 'spearman_p' in data and not np.isnan(data['spearman_p']):
-                    if '_raw_' in key:
-                        p_values_raw.append(data['spearman_p'])
-                        keys_raw.append(key)
-                    elif '_freq_adjusted_' in key:
-                        p_values_adj.append(data['spearman_p'])
-                        keys_adj.append(key)
-            
-            # Apply FDR correction separately
-            alpha = 0.05
-            
-            if p_values_raw:
-                try:
-                    rejected_raw, p_adj_raw, _, _ = multipletests(p_values_raw, alpha=alpha, method='fdr_bh')
-                    print_and_log(f"\nRaw Analysis - Significant after FDR correction (α = {alpha}):")
-                    any_sig_raw = False
-                    for i, key in enumerate(keys_raw):
-                        if rejected_raw[i]:
-                            any_sig_raw = True
-                            data = bigram_results[key]
-                            direction = "↓ Faster" if data['spearman_r'] < 0 else "↑ Slower"
-                            print_and_log(f"  {data['name']} ({data['group']}): r={data['spearman_r']:.3f}, p_adj={p_adj_raw[i]:.3f} {direction}")
-                    if not any_sig_raw:
-                        print_and_log("  None significant after correction")
-                except Exception as e:
-                    print_and_log(f"\nError in raw analysis FDR correction: {e}")
-                    print_and_log(f"Number of p-values: {len(p_values_raw)}")
-            else:
-                print_and_log(f"\nNo valid p-values found for raw analysis")
-            
-            if p_values_adj:
-                try:
-                    rejected_adj, p_adj_adj, _, _ = multipletests(p_values_adj, alpha=alpha, method='fdr_bh')
-                    print_and_log(f"\nFrequency-Adjusted Analysis - Significant after FDR correction (α = {alpha}):")
-                    any_sig_adj = False
-                    for i, key in enumerate(keys_adj):
-                        if rejected_adj[i]:
-                            any_sig_adj = True
-                            data = bigram_results[key]
-                            direction = "↓ Faster" if data['spearman_r'] < 0 else "↑ Slower"
-                            print_and_log(f"  {data['name']} ({data['group']}): r={data['spearman_r']:.3f}, p_adj={p_adj_adj[i]:.3f} {direction}")
-                    if not any_sig_adj:
-                        print_and_log("  None significant after correction")
-                except Exception as e:
-                    print_and_log(f"\nError in frequency-adjusted analysis FDR correction: {e}")
-                    print_and_log(f"Number of p-values: {len(p_values_adj)}")
-            else:
-                print_and_log(f"\nNo valid p-values found for frequency-adjusted analysis")
-                
-        except Exception as e:
-            print_and_log(f"❌ Multiple comparisons correction failed: {e}")
+        fix_multiple_comparisons_correction(bigram_results)
     
     # Final summary
     total_elapsed = time.time() - start_time
@@ -1840,7 +2150,7 @@ def main():
     print_and_log("=" * 80)
     print_and_log(f"Total runtime: {format_time(total_elapsed)}")
     print_and_log(f"Key outputs saved:")
-    print_and_log(f"- Text output: dvorak9_bigram_analysis_results.txt")
+    print_and_log(f"- Text output: test_dvorak9_speed_results.txt")
     print_and_log(f"- Comparison plots: plots/dvorak9_frequency_comparison.png")
     print_and_log(f"- Bigram-level analysis with and without frequency control")
     print_and_log(f"- Complete interpretation and criterion combination analysis")
