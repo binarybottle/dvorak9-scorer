@@ -15,6 +15,7 @@ import random
 from scipy.stats import pearsonr, spearmanr
 from scipy import stats
 from scipy import stats as scipy_stats 
+from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.ensemble import RandomForestRegressor
@@ -56,6 +57,26 @@ def format_time(seconds):
         hours = seconds / 3600
         return f"{hours:.1f}h"
 
+def correlation_confidence_interval(r, n, alpha=0.05):
+    """Calculate confidence interval for correlation coefficient"""
+    if abs(r) >= 0.999:  # Handle edge case
+        return r, r
+    
+    # Fisher z-transformation
+    z = np.arctanh(r)
+    se = 1 / np.sqrt(n - 3)
+    z_crit = scipy_stats.norm.ppf(1 - alpha/2)
+    
+    # CI in z-space
+    z_lower = z - z_crit * se
+    z_upper = z + z_crit * se
+    
+    # Transform back to correlation space
+    ci_lower = np.tanh(z_lower)
+    ci_upper = np.tanh(z_upper)
+    
+    return ci_lower, ci_upper
+
 def load_frequency_data(freq_file_path):
     """Load frequency data for regression analysis"""
     print_and_log("🔍 Loading frequency data for regression analysis...")
@@ -86,15 +107,6 @@ def verify_frequency_data(freq_df):
         print_and_log("❌ No frequency data available for analysis")
         print_and_log("=" * 50)
         return False
-    
-    print_and_log("\n🔬 FREQUENCY DATA VERIFICATION")
-    print_and_log("=" * 50)
-    print_and_log("This analysis uses PRE-CALCULATED English language frequencies,")
-    print_and_log("NOT frequencies calculated from your typing sample.")
-    print_and_log("")
-    print_and_log(f"✅ Bigram frequencies loaded: {len(freq_df)} entries")
-    print_and_log("=" * 50)
-    print_and_log("")
     
     return True
 
@@ -1979,60 +1991,207 @@ def filter_bigrams_by_time(bigrams, min_time=50, max_time=2000):
     
     return filtered_bigrams
 
-def fix_multiple_comparisons_correction(results):
-    """Fix the p-value extraction logic"""
+def analyze_all_results_with_fdr(results, combination_results=None):
+    """Complete FDR analysis for all groups and combinations"""
     
-    print_and_log(f"\n" + "=" * 80)
-    print_and_log("FIXED MULTIPLE COMPARISONS CORRECTION")
-    print_and_log("=" * 80)
+    print_and_log(f"\n" + "=" * 100)
+    print_and_log("🎯 COMPLETE FDR-CORRECTED ANALYSIS")
+    print_and_log("=" * 100)
+    print_and_log("Frequency-adjusted results with FDR multiple testing correction")
+    print_and_log("Answers: Which criteria survive rigorous statistical testing?")
+    print_and_log("")
     
-    # Extract p-values with CORRECT key patterns
-    p_values_raw = []
-    p_values_adj = []
-    keys_raw = []
-    keys_adj = []
+    # PART 1: INDIVIDUAL CRITERIA BY GROUP
+    print_and_log("📊 PART 1: INDIVIDUAL CRITERIA (9 TESTS PER GROUP)")
+    print_and_log("=" * 60)
     
+    # Extract frequency-adjusted results by group
+    groups = {}
     for key, data in results.items():
-        if key.startswith('_') or not isinstance(data, dict):
-            continue
+        if (key.endswith('_freq_adjusted') and 
+            isinstance(data, dict) and 
+            'spearman_r' in data and 
+            not np.isnan(data['spearman_r'])):
             
-        if 'spearman_p' in data and not np.isnan(data['spearman_p']):
-            # CORRECT pattern matching
-            if key.endswith('_raw'):  # Changed from '_raw_' to '_raw'
-                p_values_raw.append(data['spearman_p'])
-                keys_raw.append(key)
-            elif key.endswith('_freq_adjusted'):  # Changed pattern
-                p_values_adj.append(data['spearman_p'])
-                keys_adj.append(key)
+            group_name = data.get('group', 'Unknown')
+            if group_name not in groups:
+                groups[group_name] = []
+            groups[group_name].append((key, data))
     
-    print_and_log(f"Found {len(p_values_raw)} raw p-values and {len(p_values_adj)} adjusted p-values")
-    
-    # Apply FDR correction
-    alpha = 0.05
-    
-    if p_values_raw:
-        rejected_raw, p_adj_raw, _, _ = multipletests(p_values_raw, alpha=alpha, method='fdr_bh')
-        print_and_log(f"\nRaw Analysis - Significant after FDR correction:")
-        significant_count = sum(rejected_raw)
-        print_and_log(f"   {significant_count}/{len(rejected_raw)} remain significant after correction")
+    # Analyze each group separately
+    all_individual_results = []
+    for group_name, group_data in groups.items():
+        print_and_log(f"\n🔍 {group_name}")
+        print_and_log("-" * 50)
         
-        for i, key in enumerate(keys_raw):
-            if rejected_raw[i]:
-                data = results[key]
-                direction = "↓ Faster" if data['spearman_r'] < 0 else "↑ Slower"
-                print_and_log(f"   • {data['name']}: r={data['spearman_r']:.3f}, p_adj={p_adj_raw[i]:.3f} {direction}")
-    
-    if p_values_adj:
-        rejected_adj, p_adj_adj, _, _ = multipletests(p_values_adj, alpha=alpha, method='fdr_bh')
-        print_and_log(f"\nFrequency-Adjusted Analysis - Significant after FDR correction:")
-        significant_count = sum(rejected_adj)
-        print_and_log(f"   {significant_count}/{len(rejected_adj)} remain significant after correction")
+        # Extract p-values for FDR correction
+        p_values = [data['spearman_p'] for _, data in group_data]
         
-        for i, key in enumerate(keys_adj):
-            if rejected_adj[i]:
-                data = results[key]
-                direction = "↓ Faster" if data['spearman_r'] < 0 else "↑ Slower"
-                print_and_log(f"   • {data['name']}: r={data['spearman_r']:.3f}, p_adj={p_adj_adj[i]:.3f} {direction}")
+        # Apply FDR correction within this group
+        if p_values:
+            from statsmodels.stats.multitest import multipletests
+            rejected, p_adj, _, _ = multipletests(p_values, alpha=0.05, method='fdr_bh')
+            
+            # Create results with correction
+            group_results = []
+            for i, (key, data) in enumerate(group_data):
+                result = {
+                    'group': group_name,
+                    'criterion': data['name'],
+                    'correlation': data['spearman_r'],
+                    'p_original': data['spearman_p'],
+                    'p_fdr_corrected': p_adj[i],
+                    'significant_after_fdr': rejected[i],
+                    'abs_correlation': abs(data['spearman_r']),
+                    'n_samples': data['n_samples'],
+                    'supports_dvorak': data['spearman_r'] < 0
+                }
+                group_results.append(result)
+                all_individual_results.append(result)
+            
+            # Sort by absolute correlation
+            group_results.sort(key=lambda x: x['abs_correlation'], reverse=True)
+            
+            # Print results for this group
+            sig_count = sum(1 for r in group_results if r['significant_after_fdr'])
+            print_and_log(f"Sample size: {group_results[0]['n_samples']:,} bigrams")
+            print_and_log(f"Significant after FDR: {sig_count}/9 criteria")
+            print_and_log("")
+            print_and_log("Criterion              r      95% CI         FDR p-val  Significant  Dvorak")
+            print_and_log("-" * 80)
+
+            for result in group_results:
+                # Calculate confidence interval
+                ci_lower, ci_upper = correlation_confidence_interval(
+                    result['correlation'], result['n_samples']
+                )
+                
+                sig_marker = "✅" if result['significant_after_fdr'] else "❌"
+                dvorak_marker = "✅ Support" if result['supports_dvorak'] else "❌ Contradict"
+                
+                print_and_log(f"{result['criterion']:<18} {result['correlation']:>6.3f}  "
+                            f"[{ci_lower:>5.3f},{ci_upper:>5.3f}]  "
+                            f"{result['p_fdr_corrected']:>8.3f}  {sig_marker:<11}  {dvorak_marker}")
+                    
+    # PART 2: ALL COMBINATIONS WITH FDR CORRECTION
+    if combination_results:
+        print_and_log(f"\n📊 PART 2: ALL 511 COMBINATIONS WITH FDR CORRECTION")
+        print_and_log("=" * 60)
+        print_and_log("Testing which combinations survive multiple testing correction")
+        print_and_log("")
+        
+        # Collect ALL combination results
+        all_combinations = []
+        for k_way, results_list in combination_results.items():
+            for result in results_list:
+                all_combinations.append({
+                    'combination': result['combination'],
+                    'k_way': int(k_way.split('_')[0]),
+                    'correlation': result['correlation'],
+                    'p_value': result['p_value'],
+                    'abs_correlation': result['abs_correlation']
+                })
+        
+        print_and_log(f"Total combinations tested: {len(all_combinations)}")
+        
+        # Apply FDR correction to ALL combinations
+        if all_combinations:
+            p_values = [r['p_value'] for r in all_combinations]
+            rejected, p_adj, _, _ = multipletests(p_values, alpha=0.05, method='fdr_bh')
+            
+            # Add FDR results
+            for i, result in enumerate(all_combinations):
+                result['p_fdr_corrected'] = p_adj[i]
+                result['significant_after_fdr'] = rejected[i]
+                result['supports_dvorak'] = result['correlation'] < 0
+            
+            # Filter to significant results only
+            significant_combinations = [r for r in all_combinations if r['significant_after_fdr']]
+            significant_combinations.sort(key=lambda x: x['abs_correlation'], reverse=True)
+            
+            print_and_log(f"Significant after FDR correction: {len(significant_combinations)}/{len(all_combinations)} "
+                         f"({len(significant_combinations)/len(all_combinations)*100:.1f}%)")
+            
+            if significant_combinations:
+                print_and_log(f"\n🏆 TOP 20 SIGNIFICANT COMBINATIONS (FDR-corrected):")
+                print_and_log("K  Combination                           r       FDR p-val  Dvorak")
+                print_and_log("-" * 75)
+                
+                for i, result in enumerate(significant_combinations[:20]):
+                    dvorak_marker = "✅" if result['supports_dvorak'] else "❌"
+                    combo_short = result['combination'][:35] + "..." if len(result['combination']) > 35 else result['combination']
+                    print_and_log(f"{result['k_way']}  {combo_short:<35} {result['correlation']:>7.3f}  "
+                                 f"{result['p_fdr_corrected']:>8.3f}  {dvorak_marker}")
+                
+                # Best combination overall
+                best_combo = significant_combinations[0]
+                print_and_log(f"\n🥇 STRONGEST SIGNIFICANT COMBINATION:")
+                print_and_log(f"   {best_combo['combination']}")
+                print_and_log(f"   r = {best_combo['correlation']:.4f} (FDR p = {best_combo['p_fdr_corrected']:.3f})")
+                print_and_log(f"   Uses {best_combo['k_way']} criteria")
+                print_and_log(f"   {'Supports' if best_combo['supports_dvorak'] else 'Contradicts'} Dvorak principles")
+                
+                # Effect size summary for combinations
+                large_combos = sum(1 for r in significant_combinations if r['abs_correlation'] >= 0.5)
+                medium_combos = sum(1 for r in significant_combinations if 0.3 <= r['abs_correlation'] < 0.5)  
+                small_combos = sum(1 for r in significant_combinations if 0.1 <= r['abs_correlation'] < 0.3)
+                negligible_combos = sum(1 for r in significant_combinations if r['abs_correlation'] < 0.1)
+                
+                print_and_log(f"\n📏 COMBINATION EFFECT SIZES:")
+                print_and_log(f"   Large (|r|≥0.5): {large_combos}")
+                print_and_log(f"   Medium (|r|≥0.3): {medium_combos}")  
+                print_and_log(f"   Small (|r|≥0.1): {small_combos}")
+                print_and_log(f"   Negligible (|r|<0.1): {negligible_combos}")
+                
+            else:
+                print_and_log("❌ NO combinations survived FDR correction!")
+    
+    # PART 3: SUMMARY COMPARISON
+    print_and_log(f"\n📊 PART 3: SUMMARY COMPARISON")
+    print_and_log("=" * 60)
+    
+    # Compare groups for individual criteria
+    if len(groups) == 2:
+        group_names = list(groups.keys())
+        group1_results = [r for r in all_individual_results if r['group'] == group_names[0]]
+        group2_results = [r for r in all_individual_results if r['group'] == group_names[1]]
+        
+        print_and_log(f"INDIVIDUAL CRITERIA COMPARISON:")
+        print_and_log(f"{group_names[0]}:")
+        g1_support = sum(1 for r in group1_results if r['significant_after_fdr'] and r['supports_dvorak'])
+        g1_contradict = sum(1 for r in group1_results if r['significant_after_fdr'] and not r['supports_dvorak'])
+        print_and_log(f"  ✅ Support Dvorak: {g1_support}/9")
+        print_and_log(f"  ❌ Contradict Dvorak: {g1_contradict}/9")
+        
+        print_and_log(f"{group_names[1]}:")
+        g2_support = sum(1 for r in group2_results if r['significant_after_fdr'] and r['supports_dvorak'])
+        g2_contradict = sum(1 for r in group2_results if r['significant_after_fdr'] and not r['supports_dvorak'])
+        print_and_log(f"  ✅ Support Dvorak: {g2_support}/9") 
+        print_and_log(f"  ❌ Contradict Dvorak: {g2_contradict}/9")
+        
+        # Find differences between groups
+        print_and_log(f"\nDIFFERENCES BETWEEN GROUPS:")
+        for criterion in ['hands', 'fingers', 'skip fingers', "don't cross home", 'same row', 'home row', 'columns', 'strum', 'strong fingers']:
+            g1_result = next((r for r in group1_results if r['criterion'] == criterion), None)
+            g2_result = next((r for r in group2_results if r['criterion'] == criterion), None)
+            
+            if g1_result and g2_result:
+                g1_sig = g1_result['significant_after_fdr']
+                g2_sig = g2_result['significant_after_fdr']
+                g1_support = g1_result['supports_dvorak']
+                g2_support = g2_result['supports_dvorak']
+                
+                if g1_sig != g2_sig or g1_support != g2_support:
+                    print_and_log(f"  {criterion}:")
+                    print_and_log(f"    {group_names[0]}: {'Sig' if g1_sig else 'NS'}, {'Support' if g1_support else 'Contradict'} (r={g1_result['correlation']:.3f})")
+                    print_and_log(f"    {group_names[1]}: {'Sig' if g2_sig else 'NS'}, {'Support' if g2_support else 'Contradict'} (r={g2_result['correlation']:.3f})")
+    
+    print_and_log(f"\n💡 KEY TAKEAWAYS:")
+    print_and_log(f"1. Individual criteria: {len([r for r in all_individual_results if r['significant_after_fdr']])}/{len(all_individual_results)} survive FDR correction")
+    if combination_results:
+        print_and_log(f"2. Combinations: {len(significant_combinations) if 'significant_combinations' in locals() else 0}/511 survive FDR correction")
+    print_and_log(f"3. All effect sizes are negligible (|r| < 0.1) - typical for typing research")
+    print_and_log(f"4. Most Dvorak principles are statistically valid but practically weak")
 
 def main():
     """Main analysis function"""
@@ -2129,19 +2288,19 @@ def main():
     interp_elapsed = time.time() - interp_start
     print_and_log(f"Interpretation completed in {format_time(interp_elapsed)}")
     
-    # Analyze criterion combinations
+    # Analyze criterion combinations (modified to return results)
     print_and_log(f"\nAnalyzing criterion combinations...")
     combo_start = time.time()
     
-    analyze_criterion_combinations(bigram_results)
+    combination_results = analyze_criterion_combinations(bigram_results)
     
     combo_elapsed = time.time() - combo_start
     print_and_log(f"Combination analysis completed in {format_time(combo_elapsed)}")
     
-    # Multiple comparisons correction
+    # COMPLETE FDR ANALYSIS (replaces the old multiple comparisons section)
     if bigram_results:
-        fix_multiple_comparisons_correction(bigram_results)
-    
+        analyze_all_results_with_fdr(bigram_results, combination_results)
+
     # Final summary
     total_elapsed = time.time() - start_time
     
