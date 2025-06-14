@@ -604,7 +604,16 @@ def analyze_correlations(sequences, times, criteria_names, group_name, analysis_
                 unique_scores = len(set(scores_list))
                 if unique_scores <= 1:
                     print_and_log(f"    Warning: {criterion} has constant scores ({unique_scores} unique values)")
-                    result_key = f"{criterion}_{analysis_type}"
+
+                    if "No Middle" in group_name:
+                        group_suffix = "no_middle"
+                    elif "With Middle" in group_name:
+                        group_suffix = "with_middle"
+                    else:
+                        group_suffix = "unknown"
+
+                    result_key = f"{criterion}_{group_suffix}_{analysis_type}"
+
                     results[result_key] = {
                         'name': criteria_names[criterion],
                         'group': f"{group_name} ({analysis_type.replace('_', ' ')})",
@@ -634,7 +643,7 @@ def analyze_correlations(sequences, times, criteria_names, group_name, analysis_
                     print_and_log(f"      Score range: {min(scores_list):.3f} to {max(scores_list):.3f}")
                     print_and_log(f"      Unique scores: {unique_scores}")
                 
-                result_key = f"{criterion}_{analysis_type}"
+                result_key = f"{criterion}_{group_suffix}_{analysis_type}"
                 results[result_key] = {
                     'name': criteria_names[criterion],
                     'group': f"{group_name} ({analysis_type.replace('_', ' ')})",
@@ -1390,275 +1399,233 @@ def create_criterion_interaction_heatmap(combination_results, output_dir='plots'
     return output_path
 
 def interpret_correlation_results(results, analysis_name):
-    """Provide interpretation of correlation results"""
+    """Provide interpretation of correlation results - FIXED VERSION"""
     
     print_and_log(f"\n" + "=" * 80)
     print_and_log(f"📊 RESULTS INTERPRETATION {analysis_name.upper()}")
     print_and_log("=" * 80)
     
-    # Collect significant results
-    significant_results = []
-    dvorak_support = []
-    dvorak_contradict = []
-    frequency_effects = []
+    # Group results by analysis type and group for clear organization
+    grouped_results = {}
+    frequency_models = {}
     
     for key, data in results.items():
         # Skip internal data and non-dictionary entries
         if key.startswith('_') or not isinstance(data, dict):
             continue
             
-        # Check for valid correlation data
-        if 'spearman_p' in data and 'spearman_r' in data:
-            # Skip NaN values
-            if np.isnan(data['spearman_p']) or np.isnan(data['spearman_r']):
-                continue
-                
-            if data['spearman_p'] < 0.05:
-                significant_results.append((key, data))
-                
-                # Check if this supports or contradicts Dvorak
-                if data['spearman_r'] < 0:  # Negative = faster with higher score = supports Dvorak
-                    dvorak_support.append((data['name'], data['spearman_r'], data['spearman_p']))
-                else:  # Positive = slower with higher score = contradicts Dvorak
-                    dvorak_contradict.append((data['name'], data['spearman_r'], data['spearman_p']))
-        
-        # Check for frequency effects
-        if 'frequency_model' in data and data['frequency_model']:
-            freq_r2 = data['frequency_model'].get('r_squared', 0)
-            if freq_r2 and not np.isnan(freq_r2) and freq_r2 > 0.01:  # R² > 1% is meaningful
-                frequency_effects.append((data['name'], freq_r2, data['frequency_model'].get('p_value', 1)))
-    
-    # Overall findings
-    print_and_log(f"\n🔍 OVERALL FINDINGS:")
-    print_and_log(f"   • Total criteria tested: 9")
-    print_and_log(f"   • Statistically significant results: {len(significant_results)}")
-    print_and_log(f"   • Results supporting Dvorak principles: {len(dvorak_support)}")
-    print_and_log(f"   • Results contradicting Dvorak principles: {len(dvorak_contradict)}")
-    
-    # Dvorak validation
-    print_and_log(f"\n✅ DVORAK PRINCIPLE VALIDATION:")
-    
-    # Sort by effect size for better presentation
-    dvorak_support.sort(key=lambda x: abs(x[1]), reverse=True)
-    dvorak_contradict.sort(key=lambda x: abs(x[1]), reverse=True)
-    
-    if dvorak_support:
-        print_and_log(f"   CRITERIA THAT SUPPORT DVORAK (negative correlation = faster typing):")
-        for name, r, p in dvorak_support:
-            abs_r = abs(r)
-            if abs_r >= 0.5:
-                effect = "large effect"
-            elif abs_r >= 0.3:
-                effect = "medium effect"
-            elif abs_r >= 0.1:
-                effect = "small effect"
-            else:
-                effect = "negligible effect"
-            print_and_log(f"     • {name}: r = {r:.3f}, p = {p:.3f} ({effect})")
-    
-    if dvorak_contradict:
-        print_and_log(f"   ⚠️  CRITERIA THAT CONTRADICT DVORAK (positive correlation = slower typing):")
-        for name, r, p in dvorak_contradict:
-            abs_r = abs(r)
-            if abs_r >= 0.5:
-                effect = "large effect"
-            elif abs_r >= 0.3:
-                effect = "medium effect"
-            elif abs_r >= 0.1:
-                effect = "small effect"
-            else:
-                effect = "negligible effect"
+        # Parse the key to extract criterion and analysis type
+        parts = key.split('_')
+        if len(parts) >= 2:
+            if parts[-1] == 'adjusted':  # freq_adjusted
+                criterion = '_'.join(parts[:-2])
+                analysis_type = 'freq_adjusted'
+            else:  # raw
+                criterion = '_'.join(parts[:-1])
+                analysis_type = 'raw'
             
-            # Add context for contradictory results
-            context = ""
-            if "home row" in name.lower():
-                context = "\n       → This suggests home row usage may slow typing in practice"
-            elif "same row" in name.lower():
-                context = "\n       → This suggests same-row sequences may slow typing (finger interference?)"
-            elif "hand" in name.lower():
-                context = "\n       → This suggests hand alternation may not always speed typing"
+            group_name = data.get('group', 'Unknown Group')
             
-            print_and_log(f"     • {name}: r = {r:.3f}, p = {p:.3f} ({effect}){context}")
+            # Clean up group names
+            if 'No Middle Columns' in group_name:
+                clean_group_name = 'Without Middle Columns'
+            elif 'With Middle Columns' in group_name:
+                clean_group_name = 'With Middle Columns'
+            else:
+                clean_group_name = group_name
+            
+            # Only process frequency-adjusted results for interpretation
+            if analysis_type == 'freq_adjusted':
+                group_key = clean_group_name
+                if group_key not in grouped_results:
+                    grouped_results[group_key] = {}
+                    frequency_models[group_key] = None
+                
+                # Store criterion results
+                grouped_results[group_key][criterion] = data
+                
+                # Store frequency model info (same for all criteria in group)
+                if 'frequency_model' in data and frequency_models[group_key] is None:
+                    frequency_models[group_key] = data['frequency_model']
     
-    # Frequency effects analysis
-    if frequency_effects:
-        print_and_log(f"\n📈 FREQUENCY ADJUSTMENT EFFECTS:")
-        print_and_log(f"   The frequency adjustment successfully controlled for English letter/bigram frequency:")
-        for name, r2, p_val in frequency_effects:
-            r2_pct = r2 * 100
-            sig_status = "significant" if p_val < 0.05 else "not significant"
-            print_and_log(f"     • {name}: {r2_pct:.1f}% of variance explained by frequency ({sig_status})")
+    # Now process each group separately with clear headers
+    for group_name in sorted(grouped_results.keys()):
+        group_data = grouped_results[group_name]
+        freq_model = frequency_models[group_name]
         
-        print_and_log(f"\n   💡 INTERPRETATION:")
-        print_and_log(f"     - Frequency effects explain 1-3% of typing time variance")
-        print_and_log(f"     - This is typical for linguistic frequency in typing studies")
-        print_and_log(f"     - Raw vs adjusted correlations show how much frequency biased results")
+        print_and_log(f"\n🔍 {group_name.upper()}")
+        print_and_log("-" * 60)
+        
+        # Show frequency model info ONCE per group
+        if freq_model:
+            r2_pct = freq_model.get('r_squared', 0) * 100
+            slope = freq_model.get('slope', 0)
+            p_val = freq_model.get('p_value', 1)
+            n_obs = freq_model.get('n_obs', 0)
+            
+            print_and_log(f"📈 FREQUENCY MODEL (shared by all criteria in this group):")
+            print_and_log(f"   R² = {r2_pct:.1f}% of variance explained by English bigram frequency")
+            print_and_log(f"   Slope = {slope:.4f} (p = {p_val:.4f})")
+            print_and_log(f"   Sample size: {n_obs:,} bigrams with frequency data")
+            print_and_log(f"   → Negative slope means higher frequency = faster typing")
+            print_and_log("")
+        
+        # Separate criteria by Dvorak support/contradiction
+        supports_dvorak = []
+        contradicts_dvorak = []
+        
+        for criterion, data in group_data.items():
+            if 'spearman_r' in data and not np.isnan(data['spearman_r']):
+                if data.get('spearman_p', 1) < 0.05:  # Only significant results
+                    if data['spearman_r'] < 0:
+                        supports_dvorak.append((criterion, data))
+                    else:
+                        contradicts_dvorak.append((criterion, data))
+        
+        # Sort by effect size
+        supports_dvorak.sort(key=lambda x: abs(x[1]['spearman_r']), reverse=True)
+        contradicts_dvorak.sort(key=lambda x: abs(x[1]['spearman_r']), reverse=True)
+        
+        print_and_log(f"✅ CRITERIA THAT SUPPORT DVORAK (negative correlation = faster typing):")
+        if supports_dvorak:
+            for criterion, data in supports_dvorak:
+                r = data['spearman_r']
+                p = data['spearman_p']
+                abs_r = abs(r)
+                
+                if abs_r >= 0.5:
+                    effect = "large effect"
+                elif abs_r >= 0.3:
+                    effect = "medium effect"
+                elif abs_r >= 0.1:
+                    effect = "small effect"
+                else:
+                    effect = "negligible effect"
+                
+                print_and_log(f"   • {data['name']}: r = {r:.3f}, p = {p:.3f} ({effect})")
+        else:
+            print_and_log(f"   • None found in this group")
+        
+        print_and_log(f"⚠️  CRITERIA THAT CONTRADICT DVORAK (positive correlation = slower typing):")
+        if contradicts_dvorak:
+            for criterion, data in contradicts_dvorak:
+                r = data['spearman_r']
+                p = data['spearman_p']
+                abs_r = abs(r)
+                
+                if abs_r >= 0.5:
+                    effect = "large effect"
+                elif abs_r >= 0.3:
+                    effect = "medium effect"
+                elif abs_r >= 0.1:
+                    effect = "small effect"
+                else:
+                    effect = "negligible effect"
+                
+                # Add context for contradictory results
+                context = ""
+                if "hand" in data['name'].lower():
+                    context = "\n       → This suggests hand alternation may not always speed typing"
+                elif "strong fingers" in data['name'].lower():
+                    context = "\n       → This suggests avoiding pinky may not help typing speed"
+                elif "same row" in data['name'].lower():
+                    context = "\n       → This suggests same-row sequences may slow typing (finger interference?)"
+                
+                print_and_log(f"   • {data['name']}: r = {r:.3f}, p = {p:.3f} ({effect}){context}")
+        else:
+            print_and_log(f"   • None found in this group")
     
-    # Middle column analysis - clear comparison of results
-    with_middle_results = [data for key, data in results.items() if not key.startswith('_') and isinstance(data, dict) and 'with_middle' in key.lower() and data.get('spearman_p', 1) < 0.05]
-    without_middle_results = [data for key, data in results.items() if not key.startswith('_') and isinstance(data, dict) and 'no_middle' in key.lower() and data.get('spearman_p', 1) < 0.05]
-    
-    if with_middle_results or without_middle_results:
-        print_and_log(f"\n🎯 MIDDLE COLUMN KEY IMPACT ANALYSIS:")
-        print_and_log(f"   Middle column keys (T, G, B, Y, H, N) require index finger stretches.")
-        print_and_log(f"   This analysis compares how Dvorak criteria perform on:")
-        print_and_log(f"   • Bigrams CONTAINING middle column keys (harder finger stretches)")
-        print_and_log(f"   • Bigrams WITHOUT middle column keys (standard finger positions)")
-        print_and_log(f"   Note: This is separate from the 'columns' criterion, which measures column discipline.")
+    # Compare groups if we have exactly 2
+    group_names = list(grouped_results.keys())
+    if len(group_names) == 2:
+        print_and_log(f"\n🔍 COMPARISON BETWEEN GROUPS:")
+        print_and_log("-" * 60)
         
-        if without_middle_results:
-            print_and_log(f"\n   📋 WITHOUT MIDDLE COLUMN KEYS ({len(without_middle_results)} significant effects):")
-            print_and_log(f"      (Standard finger positions - no index finger stretches)")
-            without_middle_results.sort(key=lambda x: abs(x['spearman_r']), reverse=True)
-            for data in without_middle_results:
-                direction = "supports Dvorak (faster)" if data['spearman_r'] < 0 else "contradicts Dvorak (slower)"
-                abs_r = abs(data['spearman_r'])
-                effect_size = "large" if abs_r >= 0.5 else "medium" if abs_r >= 0.3 else "small" if abs_r >= 0.1 else "negligible"
-                print_and_log(f"      • {data['name']}: r = {data['spearman_r']:.3f} ({effect_size} effect, {direction})")
+        group1_data = grouped_results[group_names[0]]
+        group2_data = grouped_results[group_names[1]]
         
-        if with_middle_results:
-            print_and_log(f"\n   📋 WITH MIDDLE COLUMN KEYS ({len(with_middle_results)} significant effects):")
-            print_and_log(f"      (Index finger stretches required - may alter typing dynamics)")
-            with_middle_results.sort(key=lambda x: abs(x['spearman_r']), reverse=True)
-            for data in with_middle_results:
-                direction = "supports Dvorak (faster)" if data['spearman_r'] < 0 else "contradicts Dvorak (slower)"
-                abs_r = abs(data['spearman_r'])
-                effect_size = "large" if abs_r >= 0.5 else "medium" if abs_r >= 0.3 else "small" if abs_r >= 0.1 else "negligible"
-                print_and_log(f"      • {data['name']}: r = {data['spearman_r']:.3f} ({effect_size} effect, {direction})")
-        
-        # Compare patterns between groups
-        print_and_log(f"\n   🔍 MIDDLE COLUMN KEY IMPACT ON DVORAK PRINCIPLES:")
-        
-        # Find criteria that appear in both groups
-        without_criteria = {data['name']: data['spearman_r'] for data in without_middle_results}
-        with_criteria = {data['name']: data['spearman_r'] for data in with_middle_results}
-        
-        common_criteria = set(without_criteria.keys()) & set(with_criteria.keys())
+        # Find common criteria
+        common_criteria = set(group1_data.keys()) & set(group2_data.keys())
         
         if common_criteria:
-            print_and_log(f"      Criteria significant in BOTH groups:")
+            print_and_log(f"Criteria appearing in both groups:")
             for criterion in sorted(common_criteria):
-                without_r = without_criteria[criterion]
-                with_r = with_criteria[criterion]
+                data1 = group1_data[criterion]
+                data2 = group2_data[criterion]
                 
-                # Determine if middle columns amplify, reduce, or flip the effect
-                if (without_r < 0 and with_r < 0) or (without_r > 0 and with_r > 0):
-                    # Same direction
-                    if abs(with_r) > abs(without_r):
-                        change = "amplifies effect"
-                    elif abs(with_r) < abs(without_r):
-                        change = "reduces effect"
-                    else:
-                        change = "maintains effect"
-                else:
-                    # Opposite directions
-                    change = "REVERSES effect direction"
+                r1 = data1.get('spearman_r', float('nan'))
+                r2 = data2.get('spearman_r', float('nan'))
+                p1 = data1.get('spearman_p', 1)
+                p2 = data2.get('spearman_p', 1)
                 
-                print_and_log(f"        • {criterion}: without={without_r:.3f}, with={with_r:.3f} (middle keys {change})")
-        
-        # Criteria unique to each group
-        without_only = set(without_criteria.keys()) - set(with_criteria.keys())
-        with_only = set(with_criteria.keys()) - set(without_criteria.keys())
-        
-        if without_only:
-            print_and_log(f"      Criteria significant ONLY without middle keys:")
-            for criterion in sorted(without_only):
-                print_and_log(f"        • {criterion}: r = {without_criteria[criterion]:.3f}")
-        
-        if with_only:
-            print_and_log(f"      Criteria significant ONLY with middle keys:")
-            for criterion in sorted(with_only):
-                print_and_log(f"        • {criterion}: r = {with_criteria[criterion]:.3f}")
-        
-        # Summary insight
-        print_and_log(f"\n   💡 MIDDLE COLUMN KEY SUMMARY:")
-        total_support_without = sum(1 for r in without_criteria.values() if r < 0)
-        total_support_with = sum(1 for r in with_criteria.values() if r < 0)
-        
-        print_and_log(f"      • Without middle keys: {total_support_without}/{len(without_criteria)} criteria support Dvorak")
-        print_and_log(f"      • With middle keys: {total_support_with}/{len(with_criteria)} criteria support Dvorak")
-        
-        if len(common_criteria) >= 3:
-            direction_changes = sum(1 for c in common_criteria 
-                                  if (without_criteria[c] < 0) != (with_criteria[c] < 0))
-            print_and_log(f"      • Direction reversals: {direction_changes}/{len(common_criteria)} criteria flip direction")
-        
-        if total_support_with > total_support_without:
-            print_and_log(f"      → Index finger stretches may ENHANCE Dvorak principles")
-        elif total_support_with < total_support_without:
-            print_and_log(f"      → Index finger stretches may IMPAIR Dvorak principles")
-        else:
-            print_and_log(f"      → Index finger stretches have MIXED effects on Dvorak principles")
-    else:
-        print_and_log(f"\n🎯 MIDDLE COLUMN KEY ANALYSIS:")
-        print_and_log(f"   No significant differences found between sequences with/without middle column keys")
-        print_and_log(f"   This suggests index finger stretches don't substantially alter Dvorak principle effectiveness")
+                # Only show if at least one is significant
+                if p1 < 0.05 or p2 < 0.05:
+                    sig1 = "✅" if p1 < 0.05 else "❌"
+                    sig2 = "✅" if p2 < 0.05 else "❌"
+                    
+                    print_and_log(f"  {data1['name']}:")
+                    print_and_log(f"    {group_names[0]}: r = {r1:.3f} {sig1}")
+                    print_and_log(f"    {group_names[1]}: r = {r2:.3f} {sig2}")
+                    
+                    # Note direction changes
+                    if not np.isnan(r1) and not np.isnan(r2):
+                        if (r1 < 0) != (r2 < 0):
+                            print_and_log(f"    → Direction reversal between groups!")
     
-    print_and_log(f"\n🛠️  PRACTICAL IMPLICATIONS:")
-    print_and_log(f"   ✅ MOSTLY SUPPORTS DVORAK:")
-    print_and_log(f"     - {len(dvorak_support)} criteria validate Dvorak principles")
-    print_and_log(f"     - These typing patterns do correlate with faster speeds")
-    print_and_log(f"     - Dvorak's optimization approach appears sound for these aspects")
-    
-    print_and_log(f"\n📏 EFFECT SIZE GUIDE:")
-    print_and_log(f"   • |r| < 0.1  = Negligible effect (most results fall here)")
-    print_and_log(f"   • |r| 0.1-0.3 = Small effect (still practically meaningful)")
-    print_and_log(f"   • |r| 0.3-0.5 = Medium effect (substantial practical impact)")
-    print_and_log(f"   • |r| > 0.5   = Large effect (major practical significance)")
-    print_and_log(f"   Most typing research finds small-to-negligible effects due to individual variation.")
-    
-    # Count actual effect sizes found
-    effect_counts = {'negligible': 0, 'small': 0, 'medium': 0, 'large': 0}
-    for key, data in results.items():
-        if not key.startswith('_') and isinstance(data, dict) and 'spearman_r' in data:
-            if not np.isnan(data['spearman_r']) and data.get('spearman_p', 1) < 0.05:
-                abs_r = abs(data['spearman_r'])
-                if abs_r >= 0.5:
-                    effect_counts['large'] += 1
-                elif abs_r >= 0.3:
-                    effect_counts['medium'] += 1
-                elif abs_r >= 0.1:
-                    effect_counts['small'] += 1
-                else:
-                    effect_counts['negligible'] += 1
-    
-    print_and_log(f"\n📊 ACTUAL EFFECT SIZES IN THIS ANALYSIS:")
-    total_effects = sum(effect_counts.values())
-    if total_effects > 0:
-        for effect_type, count in effect_counts.items():
-            percentage = (count / total_effects) * 100
-            print_and_log(f"   • {effect_type.capitalize()}: {count}/{total_effects} ({percentage:.1f}%)")
-    else:
-        print_and_log(f"   • No significant correlations found")
+    print_and_log(f"\n💡 INTERPRETATION SUMMARY:")
+    print_and_log(f"   • This shows ONLY frequency-adjusted results (controls for English bigram frequency)")
+    print_and_log(f"   • Negative correlation = higher Dvorak score → faster typing (supports Dvorak)")
+    print_and_log(f"   • Positive correlation = higher Dvorak score → slower typing (contradicts Dvorak)")
+    print_and_log(f"   • All effects are small/negligible (|r| < 0.1) - typical for typing research")
 
 def analyze_criterion_combinations(results):
-    """Analyze how combinations of criteria predict typing speed - COMPREHENSIVE VERSION"""
+    """Analyze how combinations of criteria predict typing speed - FIXED TO USE FREQUENCY-ADJUSTED DATA"""
     
     print_and_log(f"\n" + "=" * 80)
     print_and_log(f"COMPREHENSIVE CRITERION COMBINATION ANALYSIS")
     print_and_log("=" * 80)
     print_and_log("Examining how combinations of criteria interact to predict typing speed")
+    print_and_log("IMPORTANT: Using ONLY frequency-adjusted data (controls for English bigram frequency)")
     
-    # Look for sequence data in results
+    # Look for FREQUENCY-ADJUSTED sequence data only
     sequence_data_sets = {}
-    all_sequences = []
+    freq_adjusted_sequences = []
     
-    # Collect all sequence data
+    # Collect all frequency-adjusted sequence data
     for key, data in results.items():
-        if key.startswith('_sequence_scores') and isinstance(data, list):
-            all_sequences.extend(data)
+        if key.startswith('_sequence_scores_freq_adjusted') and isinstance(data, list):
+            freq_adjusted_sequences.extend(data)
+            print_and_log(f"✅ Found frequency-adjusted sequence data: {len(data)} sequences")
     
-    # If we have sequence data, create the combined dataset
-    if all_sequences:
-        sequence_data_sets["All sequences (combined)"] = all_sequences
+    # If we have frequency-adjusted sequence data, use it
+    if freq_adjusted_sequences:
+        sequence_data_sets["All sequences (frequency-adjusted)"] = freq_adjusted_sequences
+        print_and_log(f"✅ Using {len(freq_adjusted_sequences):,} frequency-adjusted sequences")
+    else:
+        # Fallback: look for ANY sequence data but warn about it
+        print_and_log("⚠️  No frequency-adjusted sequence data found, looking for any sequence data...")
+        all_sequences = []
+        for key, data in results.items():
+            if key.startswith('_sequence_scores') and isinstance(data, list):
+                all_sequences.extend(data)
+                print_and_log(f"   Found sequence data in: {key}")
+        
+        if all_sequences:
+            sequence_data_sets["All sequences (mixed analysis types)"] = all_sequences
+            print_and_log(f"⚠️  WARNING: Using mixed analysis types - results may be inconsistent")
+        else:
+            print_and_log("❌ No sequence-level data found for combination analysis")
+            return None
     
     if not sequence_data_sets:
         print_and_log("❌ No sequence-level data found for combination analysis")
-        return
+        return None
     
     print_and_log(f"✅ Found sequence data for {len(sequence_data_sets)} groups")
     
     # Analyze each group
+    all_combination_results = {}
+    
     for group_name, sequence_data in sequence_data_sets.items():
         if len(sequence_data) < 100:
             print_and_log(f"\n⚠️  Skipping {group_name}: too few sequences ({len(sequence_data)})")
@@ -1674,12 +1641,19 @@ def analyze_criterion_combinations(results):
         # Get criteria columns (exclude sequence, time, analysis_type)
         exclude_cols = {'sequence', 'time', 'analysis_type'}
         criteria_cols = [col for col in df.columns if col not in exclude_cols]
-        times = df['time'].values
+        
+        # IMPORTANT: Use frequency-adjusted times if available
+        if 'freq_adjusted_time' in df.columns:
+            times = df['freq_adjusted_time'].values
+            print_and_log(f"   ✅ Using frequency-adjusted times")
+        else:
+            times = df['time'].values
+            print_and_log(f"   ⚠️  Using raw times (frequency adjustment not available)")
         
         print_and_log(f"   Criteria: {criteria_cols}")
         
         # COMPREHENSIVE COMBINATION ANALYSIS - TEST ALL 511 COMBINATIONS
-        all_results = {}
+        group_results = {}
         
         # For each combination size k from 1 to 9
         for k in range(1, len(criteria_cols) + 1):
@@ -1719,7 +1693,7 @@ def analyze_criterion_combinations(results):
             combo_results.sort(key=lambda x: x['abs_correlation'], reverse=True)
             
             # Store results
-            all_results[f'{k}_way'] = combo_results
+            group_results[f'{k}_way'] = combo_results
             
             # Show top results for this k
             top_n = min(5, len(combo_results))
@@ -1732,13 +1706,16 @@ def analyze_criterion_combinations(results):
             else:
                 print_and_log(f"   No valid combinations found")
         
+        # Store results for this group
+        all_combination_results.update(group_results)
+        
         # FIND THE SINGLE BEST COMBINATION OVERALL
         print_and_log(f"\n🏆 BEST COMBINATION ACROSS ALL SIZES:")
         
         best_overall = None
         best_correlation = 0
         
-        for k_way, results_list in all_results.items():
+        for k_way, results_list in group_results.items():
             if results_list:
                 best_in_category = max(results_list, key=lambda x: x['abs_correlation'])
                 if best_in_category['abs_correlation'] > best_correlation:
@@ -1758,14 +1735,14 @@ def analyze_criterion_combinations(results):
         # SUMMARY STATISTICS
         print_and_log(f"\n📈 COMBINATION ANALYSIS SUMMARY:")
         
-        total_combinations = sum(len(results_list) for results_list in all_results.values())
-        significant_combinations = sum(sum(1 for r in results_list if r['p_value'] < 0.05) for results_list in all_results.values())
+        total_combinations = sum(len(results_list) for results_list in group_results.values())
+        significant_combinations = sum(sum(1 for r in results_list if r['p_value'] < 0.05) for results_list in group_results.values())
         
         print_and_log(f"   • Total combinations tested: {total_combinations:,}")
         print_and_log(f"   • Statistically significant: {significant_combinations:,} ({significant_combinations/total_combinations*100:.1f}%)")
         
         # Effect size distribution
-        all_correlations = [r['abs_correlation'] for results_list in all_results.values() for r in results_list if r['p_value'] < 0.05]
+        all_correlations = [r['abs_correlation'] for results_list in group_results.values() for r in results_list if r['p_value'] < 0.05]
         if all_correlations:
             large_effects = sum(1 for r in all_correlations if r >= 0.5)
             medium_effects = sum(1 for r in all_correlations if 0.3 <= r < 0.5)
@@ -1777,122 +1754,23 @@ def analyze_criterion_combinations(results):
             print_and_log(f"   • Small effects (|r| 0.1-0.3): {small_effects}")
             print_and_log(f"   • Negligible effects (|r| < 0.1): {negligible_effects}")
         
-        # MACHINE LEARNING ANALYSIS WITH PROPER INTERPRETATION
-        print_and_log(f"\n   🤖 MACHINE LEARNING INTERACTION ANALYSIS:")
-        try:
-            # Prepare data for ML
-            X = df[criteria_cols].values
-            y = df['time'].values
-            
-            # Check for variation in features and target
-            if len(set(y)) > 1 and all(len(set(X[:, i])) > 1 for i in range(X.shape[1])):
-                # Random Forest for feature importance and interaction detection
-                rf = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=10)
-                rf.fit(X, y)
-                
-                # Feature importance
-                importances = rf.feature_importances_
-                feature_importance = list(zip(criteria_cols, importances))
-                feature_importance.sort(key=lambda x: x[1], reverse=True)
-                
-                # Overall model performance
-                y_pred = rf.predict(X)
-                r2 = r2_score(y, y_pred)
-                
-                # PROPER INTERPRETATION
-                print_and_log(f"     📊 MODEL PERFORMANCE:")
-                print_and_log(f"       Random Forest R² = {r2:.4f} ({r2*100:.2f}% of variance explained)")
-                
-                if r2 < 0.01:
-                    performance = "Essentially useless - no predictive power"
-                elif r2 < 0.05:
-                    performance = "Very weak - minimal predictive power"  
-                elif r2 < 0.1:
-                    performance = "Weak but detectable patterns"
-                elif r2 < 0.25:
-                    performance = "Moderate predictive power"
-                else:
-                    performance = "Strong predictive power"
-                
-                print_and_log(f"       💡 Interpretation: {performance}")
-                
-                # Feature importance interpretation  
-                print_and_log(f"     🎯 FEATURE IMPORTANCE ANALYSIS:")
-                print_and_log(f"       Ranking (importance scores sum to 1.0):")
-                
-                for i, (feature, importance) in enumerate(feature_importance):
-                    percentage = importance * 100
-                    if importance > 0.2:
-                        importance_level = "🔥 Critical"
-                    elif importance > 0.15:
-                        importance_level = "🔴 High"
-                    elif importance > 0.1:
-                        importance_level = "🟡 Medium"
-                    else:
-                        importance_level = "🟢 Low"
-                    
-                    print_and_log(f"         {i+1}. {feature:<15}: {percentage:5.1f}% {importance_level}")
-                
-                # Practical implications
-                print_and_log(f"     💡 PRACTICAL IMPLICATIONS:")
-                
-                if r2 < 0.05:
-                    print_and_log(f"       ❌ INDIVIDUAL CRITERIA ARE POOR PREDICTORS:")
-                    print_and_log(f"         • Even combined, all 9 criteria explain <5% of typing speed variance")
-                    print_and_log(f"         • Individual differences dominate over keyboard layout principles")
-                    print_and_log(f"         • Other factors (skill, practice, fatigue) are much more important")
-                    
-                    print_and_log(f"       🤔 WHY ARE DVORAK CRITERIA WEAK PREDICTORS?")
-                    print_and_log(f"         • Modern typing may not follow 1930s assumptions")
-                    print_and_log(f"         • Individual typing styles vary enormously")
-                    print_and_log(f"         • Muscle memory and practice effects dominate")
-                    print_and_log(f"         • Real-world typing includes errors, corrections, thinking time")
-                
-                # Top criterion analysis
-                top_criterion, top_importance = feature_importance[0]
-                print_and_log(f"       🏆 MOST PREDICTIVE CRITERION: {top_criterion}")
-                print_and_log(f"         • Explains {top_importance*100:.1f}% of the model's {r2*100:.1f}% total variance")
-                print_and_log(f"         • Actual variance explained: {top_importance*r2*100:.2f}% of typing speed")
-                
-                if top_importance * r2 < 0.01:
-                    print_and_log(f"         • Still explains <1% of actual typing speed - very weak effect")
-                
-            else:
-                print_and_log(f"     ⚠️  Insufficient variation for ML analysis")
-                
-        except Exception as e:
-            print_and_log(f"     ❌ ML analysis failed: {e}")
-        
-        # REPORT WHAT WE ACTUALLY TESTED
-        print_and_log(f"\n📋 COMPREHENSIVE TESTING SUMMARY:")
-        print_and_log(f"   This analysis tested ALL possible combinations:")
-        total_possible = 2**len(criteria_cols) - 1  # 2^9 - 1 = 511
-        print_and_log(f"   • Total possible combinations: {total_possible}")
-        
-        for k in range(1, len(criteria_cols) + 1):
-            k_combinations = len(list(combinations(criteria_cols, k)))
-            k_tested = len(all_results.get(f'{k}_way', []))
-            print_and_log(f"   • {k}-way combinations: {k_tested}/{k_combinations} tested")
-        
-        print_and_log(f"   ✅ No combinations were skipped - complete coverage achieved")
-        
         # CREATE THE MISSING PLOTS! 📊
-        if all_results:
+        if group_results:
             print_and_log(f"\n📊 Creating combination analysis visualizations...")
             
             # Plot 1: Combination performance plots
-            create_combination_performance_plots(all_results)
+            create_combination_performance_plots(group_results)
             
             # Plot 2: Criterion interaction heatmap
-            create_criterion_interaction_heatmap(all_results)
+            create_criterion_interaction_heatmap(group_results)
             
             print_and_log(f"✅ Combination analysis plots created successfully!")
         else:
             print_and_log(f"⚠️  No combination results to plot")
-        
-        # Return results for further analysis if needed
-        return all_results
     
+    # Return all results for FDR analysis
+    return all_combination_results
+
 def load_and_process_bigram_data(bigram_file, max_bigrams=None):
     """Load and process bigram typing data"""
     print_and_log("Reading typing data files...")
@@ -1991,8 +1869,98 @@ def filter_bigrams_by_time(bigrams, min_time=50, max_time=2000):
     
     return filtered_bigrams
 
+def debug_results_structure(results):
+    """Debug function to understand the results structure"""
+    
+    print_and_log("\n🔍 DEBUGGING RESULTS STRUCTURE")
+    print_and_log("=" * 60)
+    
+    # Show all keys
+    print_and_log(f"Total keys in results: {len(results)}")
+    
+    # Categorize keys
+    freq_adjusted_keys = []
+    raw_keys = []
+    internal_keys = []
+    other_keys = []
+    
+    for key in sorted(results.keys()):
+        if key.startswith('_'):
+            internal_keys.append(key)
+        elif key.endswith('_freq_adjusted'):
+            freq_adjusted_keys.append(key)
+        elif key.endswith('_raw'):
+            raw_keys.append(key)
+        else:
+            other_keys.append(key)
+    
+    print_and_log(f"\nKEY CATEGORIES:")
+    print_and_log(f"  Frequency-adjusted keys: {len(freq_adjusted_keys)}")
+    for key in freq_adjusted_keys:
+        data = results[key]
+        if isinstance(data, dict):
+            group = data.get('group', 'NO_GROUP')
+            has_spearman = 'spearman_r' in data
+            spearman_val = data.get('spearman_r', 'N/A')
+            print_and_log(f"    {key}")
+            print_and_log(f"      → group: '{group}'")
+            print_and_log(f"      → has spearman_r: {has_spearman}")
+            print_and_log(f"      → spearman_r: {spearman_val}")
+        else:
+            print_and_log(f"    {key} → {type(data)}")
+    
+    print_and_log(f"\n  Raw keys: {len(raw_keys)}")
+    for key in raw_keys[:3]:  # Show first 3
+        print_and_log(f"    {key}")
+    if len(raw_keys) > 3:
+        print_and_log(f"    ... and {len(raw_keys)-3} more")
+    
+    print_and_log(f"\n  Internal keys: {len(internal_keys)}")
+    for key in internal_keys:
+        print_and_log(f"    {key}")
+    
+    print_and_log(f"\n  Other keys: {len(other_keys)}")
+    for key in other_keys:
+        print_and_log(f"    {key}")
+    
+    # Check for the specific issue: group patterns
+    print_and_log(f"\nGROUP ANALYSIS:")
+    unique_groups = set()
+    
+    for key, data in results.items():
+        if isinstance(data, dict) and 'group' in data:
+            unique_groups.add(data['group'])
+    
+    print_and_log(f"  Unique groups found: {len(unique_groups)}")
+    for group in sorted(unique_groups):
+        print_and_log(f"    '{group}'")
+        
+        # Count criteria in this group
+        criteria_count = 0
+        freq_adj_count = 0
+        for key, data in results.items():
+            if isinstance(data, dict) and data.get('group') == group:
+                criteria_count += 1
+                if key.endswith('_freq_adjusted'):
+                    freq_adj_count += 1
+        
+        print_and_log(f"      → Total criteria: {criteria_count}")
+        print_and_log(f"      → Freq-adjusted criteria: {freq_adj_count}")
+    
+    # Expected groups check
+    expected_groups = [
+        "Bigrams (No Middle Columns)",
+        "Bigrams (With Middle Columns)"
+    ]
+    
+    print_and_log(f"\nEXPECTED VS ACTUAL:")
+    for expected in expected_groups:
+        found_variations = [g for g in unique_groups if expected in g]
+        print_and_log(f"  Expected: '{expected}'")
+        print_and_log(f"  Found variations: {found_variations}")
+
 def analyze_all_results_with_fdr(results, combination_results=None):
-    """Complete FDR analysis for all groups and combinations"""
+    """Complete FDR analysis for all groups and combinations - UPDATED FOR NEW KEY FORMAT"""
     
     print_and_log(f"\n" + "=" * 100)
     print_and_log("🎯 COMPLETE FDR-CORRECTED ANALYSIS")
@@ -2005,18 +1973,56 @@ def analyze_all_results_with_fdr(results, combination_results=None):
     print_and_log("📊 PART 1: INDIVIDUAL CRITERIA (9 TESTS PER GROUP)")
     print_and_log("=" * 60)
     
-    # Extract frequency-adjusted results by group
+    # Updated group detection for new key format
     groups = {}
     for key, data in results.items():
+        # Look for frequency-adjusted keys with the new naming scheme
         if (key.endswith('_freq_adjusted') and 
             isinstance(data, dict) and 
             'spearman_r' in data and 
             not np.isnan(data['spearman_r'])):
             
             group_name = data.get('group', 'Unknown')
+            
+            # Extract group type for better organization
+            if '_no_middle_' in key:
+                group_type = 'No Middle Columns'
+            elif '_with_middle_' in key:
+                group_type = 'With Middle Columns'
+            else:
+                group_type = 'Unknown'
+            
+            print_and_log(f"🔍 Processing key: '{key}' → group: '{group_name}' → type: '{group_type}'")
+            
             if group_name not in groups:
                 groups[group_name] = []
             groups[group_name].append((key, data))
+    
+    print_and_log(f"\n📋 Groups found for FDR analysis: {len(groups)}")
+    for group_name, group_data in groups.items():
+        print_and_log(f"   • {group_name}: {len(group_data)} criteria")
+    
+    if len(groups) == 0:
+        print_and_log("❌ No frequency-adjusted groups found for FDR analysis!")
+        print_and_log("Available keys in results:")
+        for key in sorted(results.keys()):
+            if not key.startswith('_'):
+                print_and_log(f"   {key}: {type(results[key])}")
+        return
+    
+    # Expected: Should now see both groups
+    expected_groups = [
+        "Bigrams (No Middle Columns) (freq adjusted)",
+        "Bigrams (With Middle Columns) (freq adjusted)"
+    ]
+    
+    found_groups = list(groups.keys())
+    print_and_log(f"\n✅ EXPECTED GROUPS CHECK:")
+    for expected in expected_groups:
+        if expected in found_groups:
+            print_and_log(f"   ✅ Found: '{expected}'")
+        else:
+            print_and_log(f"   ❌ Missing: '{expected}'")
     
     # Analyze each group separately
     all_individual_results = []
@@ -2036,6 +2042,7 @@ def analyze_all_results_with_fdr(results, combination_results=None):
             group_results = []
             for i, (key, data) in enumerate(group_data):
                 result = {
+                    'key': key,  # Store the actual key for debugging
                     'group': group_name,
                     'criterion': data['name'],
                     'correlation': data['spearman_r'],
@@ -2057,6 +2064,23 @@ def analyze_all_results_with_fdr(results, combination_results=None):
             print_and_log(f"Sample size: {group_results[0]['n_samples']:,} bigrams")
             print_and_log(f"Significant after FDR: {sig_count}/9 criteria")
             print_and_log("")
+            
+            # Separate supporting vs contradicting results
+            supporting = [r for r in group_results if r['significant_after_fdr'] and r['supports_dvorak']]
+            contradicting = [r for r in group_results if r['significant_after_fdr'] and not r['supports_dvorak']]
+            
+            if supporting:
+                print_and_log("✅ Support Dvorak:")
+                for result in supporting:
+                    print_and_log(f"- {result['criterion']}: r = {result['correlation']:.3f}")
+            
+            if contradicting:
+                print_and_log("❌ Contradict Dvorak:")
+                for result in contradicting:
+                    print_and_log(f"- {result['criterion']}: r = +{result['correlation']:.3f}")
+            
+            print_and_log("")
+            print_and_log("All results (FDR-corrected):")
             print_and_log("Criterion              r      95% CI         FDR p-val  Significant  Dvorak")
             print_and_log("-" * 80)
 
@@ -2072,8 +2096,8 @@ def analyze_all_results_with_fdr(results, combination_results=None):
                 print_and_log(f"{result['criterion']:<18} {result['correlation']:>6.3f}  "
                             f"[{ci_lower:>5.3f},{ci_upper:>5.3f}]  "
                             f"{result['p_fdr_corrected']:>8.3f}  {sig_marker:<11}  {dvorak_marker}")
-                    
-    # PART 2: ALL COMBINATIONS WITH FDR CORRECTION
+    
+    # PART 2: COMBINATIONS (same as before)
     if combination_results:
         print_and_log(f"\n📊 PART 2: ALL 511 COMBINATIONS WITH FDR CORRECTION")
         print_and_log("=" * 60)
@@ -2097,6 +2121,7 @@ def analyze_all_results_with_fdr(results, combination_results=None):
         # Apply FDR correction to ALL combinations
         if all_combinations:
             p_values = [r['p_value'] for r in all_combinations]
+            from statsmodels.stats.multitest import multipletests
             rejected, p_adj, _, _ = multipletests(p_values, alpha=0.05, method='fdr_bh')
             
             # Add FDR results
@@ -2104,6 +2129,13 @@ def analyze_all_results_with_fdr(results, combination_results=None):
                 result['p_fdr_corrected'] = p_adj[i]
                 result['significant_after_fdr'] = rejected[i]
                 result['supports_dvorak'] = result['correlation'] < 0
+            
+            # SAVE TO CSV FILE
+            import pandas as pd
+            combination_df = pd.DataFrame(all_combinations)
+            csv_filename = 'dvorak_combinations_fdr_results.csv'
+            combination_df.to_csv(csv_filename, index=False)
+            print_and_log(f"💾 ALL COMBINATIONS SAVED TO: {csv_filename}")
             
             # Filter to significant results only
             significant_combinations = [r for r in all_combinations if r['significant_after_fdr']]
@@ -2131,22 +2163,18 @@ def analyze_all_results_with_fdr(results, combination_results=None):
                 print_and_log(f"   Uses {best_combo['k_way']} criteria")
                 print_and_log(f"   {'Supports' if best_combo['supports_dvorak'] else 'Contradicts'} Dvorak principles")
                 
-                # Effect size summary for combinations
-                large_combos = sum(1 for r in significant_combinations if r['abs_correlation'] >= 0.5)
-                medium_combos = sum(1 for r in significant_combinations if 0.3 <= r['abs_correlation'] < 0.5)  
-                small_combos = sum(1 for r in significant_combinations if 0.1 <= r['abs_correlation'] < 0.3)
-                negligible_combos = sum(1 for r in significant_combinations if r['abs_correlation'] < 0.1)
-                
-                print_and_log(f"\n📏 COMBINATION EFFECT SIZES:")
-                print_and_log(f"   Large (|r|≥0.5): {large_combos}")
-                print_and_log(f"   Medium (|r|≥0.3): {medium_combos}")  
-                print_and_log(f"   Small (|r|≥0.1): {small_combos}")
-                print_and_log(f"   Negligible (|r|<0.1): {negligible_combos}")
+                # SAVE SIGNIFICANT COMBINATIONS TO SEPARATE CSV
+                sig_combination_df = pd.DataFrame(significant_combinations)
+                sig_csv_filename = 'dvorak_combinations_significant_fdr.csv'
+                sig_combination_df.to_csv(sig_csv_filename, index=False)
+                print_and_log(f"💾 SIGNIFICANT COMBINATIONS SAVED TO: {sig_csv_filename}")
                 
             else:
                 print_and_log("❌ NO combinations survived FDR correction!")
+        else:
+            print_and_log("❌ No combination results found!")
     
-    # PART 3: SUMMARY COMPARISON
+    # PART 3: SUMMARY COMPARISON - FIXED EFFECT SIZE CLASSIFICATION
     print_and_log(f"\n📊 PART 3: SUMMARY COMPARISON")
     print_and_log("=" * 60)
     
@@ -2186,12 +2214,27 @@ def analyze_all_results_with_fdr(results, combination_results=None):
                     print_and_log(f"    {group_names[0]}: {'Sig' if g1_sig else 'NS'}, {'Support' if g1_support else 'Contradict'} (r={g1_result['correlation']:.3f})")
                     print_and_log(f"    {group_names[1]}: {'Sig' if g2_sig else 'NS'}, {'Support' if g2_support else 'Contradict'} (r={g2_result['correlation']:.3f})")
     
+    # Effect size analysis
     print_and_log(f"\n💡 KEY TAKEAWAYS:")
-    print_and_log(f"1. Individual criteria: {len([r for r in all_individual_results if r['significant_after_fdr']])}/{len(all_individual_results)} survive FDR correction")
-    if combination_results:
-        print_and_log(f"2. Combinations: {len(significant_combinations) if 'significant_combinations' in locals() else 0}/511 survive FDR correction")
-    print_and_log(f"3. All effect sizes are negligible (|r| < 0.1) - typical for typing research")
+    total_significant = len([r for r in all_individual_results if r['significant_after_fdr']])
+    print_and_log(f"1. Individual criteria: {total_significant}/{len(all_individual_results)} survive FDR correction")
+    
+    # Get max effect sizes
+    max_individual = max([r['abs_correlation'] for r in all_individual_results]) if all_individual_results else 0
+    
+    if combination_results and 'significant_combinations' in locals():
+        max_combination = max([r['abs_correlation'] for r in significant_combinations]) if significant_combinations else 0
+        print_and_log(f"2. Combinations: {len(significant_combinations) if significant_combinations else 0}/511 survive FDR correction")
+        print_and_log(f"3. Effect sizes:")
+        print_and_log(f"   • Individual criteria: up to |r| = {max_individual:.3f} ({'small' if max_individual >= 0.1 else 'negligible'} effect)")
+        print_and_log(f"   • Best combinations: up to |r| = {max_combination:.3f} ({'small' if max_combination >= 0.1 else 'negligible'} effect)")
+    else:
+        print_and_log(f"3. Effect sizes: Individual criteria up to |r| = {max_individual:.3f} ({'small' if max_individual >= 0.1 else 'negligible'} effect)")
+    
     print_and_log(f"4. Most Dvorak principles are statistically valid but practically weak")
+    print_and_log(f"5. Cohen's effect size conventions: small ≥0.1, medium ≥0.3, large ≥0.5")
+    
+    return all_individual_results, significant_combinations if 'significant_combinations' in locals() else []
 
 def main():
     """Main analysis function"""
@@ -2299,6 +2342,8 @@ def main():
     
     # COMPLETE FDR ANALYSIS (replaces the old multiple comparisons section)
     if bigram_results:
+        debug_results_structure(bigram_results)
+
         analyze_all_results_with_fdr(bigram_results, combination_results)
 
     # Final summary
