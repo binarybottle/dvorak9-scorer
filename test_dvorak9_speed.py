@@ -9,23 +9,24 @@ with comprehensive frequency adjustment and middle column key analysis.
 import pandas as pd
 import numpy as np
 import time
-import argparse
 from pathlib import Path
-import random
 from scipy.stats import pearsonr, spearmanr
 from scipy import stats
 from scipy import stats as scipy_stats 
 from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import r2_score
 import warnings
-from itertools import combinations
 from statsmodels.stats.multitest import multipletests
 import statsmodels.api as sm
+from collections import defaultdict
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy import stats as scipy_stats
+from collections import Counter
+from itertools import combinations
+import argparse
+import sys
+import random
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -98,6 +99,307 @@ def load_frequency_data(freq_file_path):
     except Exception as e:
         print_and_log(f"❌ Error loading frequency data: {e}")
         return None
+
+def load_empirical_weights(csv_file="dvorak_combinations_fdr_results.csv", significance_threshold=0.05):
+    """
+    Load empirical combination weights from FDR analysis results.
+    
+    Args:
+        csv_file: Path to the CSV file with combination results
+        significance_threshold: Only use combinations significant after FDR correction
+    
+    Returns:
+        Dictionary mapping combination tuples to correlation weights
+    """
+    print(f"Loading empirical weights from {csv_file}...")
+    
+    try:
+        df = pd.read_csv(csv_file)
+        print(f"✅ Loaded {len(df)} combinations from analysis")
+    except Exception as e:
+        print(f"❌ Error loading weights file: {e}")
+        return {}
+    
+    # Filter to significant results only
+    if 'significant_after_fdr' in df.columns:
+        significant_df = df[df['significant_after_fdr'] == True]
+        print(f"✅ Using {len(significant_df)}/{len(df)} FDR-significant combinations")
+    else:
+        # Fallback to p-value threshold
+        significant_df = df[df['p_value'] < significance_threshold]
+        print(f"✅ Using {len(significant_df)}/{len(df)} combinations with p < {significance_threshold}")
+    
+    # Convert to weights dictionary
+    weights = {}
+    
+    for _, row in significant_df.iterrows():
+        # Parse combination string into tuple
+        combo_str = row['combination']
+        
+        if ' + ' in combo_str:
+            combo_parts = [part.strip() for part in combo_str.split(' + ')]
+        else:
+            combo_parts = [combo_str.strip()]
+        
+        # Sort for consistent lookup
+        combo_tuple = tuple(sorted(combo_parts))
+        
+        # Use correlation as weight (negative = good for typing)
+        weights[combo_tuple] = row['correlation']
+    
+    print(f"✅ Created {len(weights)} empirical weights")
+    
+    # Show some examples
+    print(f"\nTop 5 strongest combinations:")
+    sorted_weights = sorted(weights.items(), key=lambda x: abs(x[1]), reverse=True)
+    for i, (combo, weight) in enumerate(sorted_weights[:5]):
+        combo_str = ' + '.join(combo)
+        direction = "supports Dvorak" if weight < 0 else "contradicts Dvorak"
+        print(f"  {i+1}. {combo_str}: {weight:.4f} ({direction})")
+    
+    return weights
+
+class Dvorak9Scorer:
+    """
+    Dvorak-9 scorer using real empirical combination weights.
+    
+    Uses actual correlations from 100k+ user analysis with FDR correction.
+    """
+    
+    def __init__(self, layout_mapping, text, weights_file="dvorak_combinations_fdr_results.csv"):
+        """
+        Initialize scorer with layout mapping and text.
+        
+        Args:
+            layout_mapping: Dict mapping characters to QWERTY positions
+            text: Text to analyze for bigram scoring
+            weights_file: Path to empirical weights CSV file
+        """
+        self.layout_mapping = layout_mapping
+        self.text = text.lower()
+        self.bigrams = self._extract_bigrams()
+        
+        # Load real empirical weights
+        self.combination_weights = load_empirical_weights(weights_file)
+        
+        # Fallback weights if file not available
+        if not self.combination_weights:
+            print("⚠️  Using fallback weights (empirical file not found)")
+            self.combination_weights = self._get_fallback_weights()
+
+    def _extract_bigrams(self):
+        """Extract all consecutive character pairs from text that exist in layout mapping."""
+        bigrams = []
+        
+        # Filter text to only characters in our layout
+        filtered_chars = [char for char in self.text if char in self.layout_mapping]
+        
+        # Create bigrams from consecutive characters
+        for i in range(len(filtered_chars) - 1):
+            char1, char2 = filtered_chars[i], filtered_chars[i + 1]
+            bigrams.append((char1, char2))
+        
+        return bigrams
+
+    def _get_fallback_weights(self):
+        """Fallback weights based on the CSV data shown."""
+        return {
+            # Individual features (from CSV)
+            ('hands',): 0.090,  # Positive = contradicts Dvorak
+            ('fingers',): -0.088,
+            ('same_row',): -0.088,
+            ('strum',): -0.087,
+            ('dont_cross_home',): -0.086,
+            ('home_row',): -0.058,
+            ('skip_fingers',): -0.041,
+            ('columns',): -0.035,
+            ('strong_fingers',): 0.013,  # Positive = contradicts Dvorak
+            
+            # Top 2-way combinations (from CSV sample)
+            ('fingers', 'same_row'): -0.120,
+            ('dont_cross_home', 'strum'): -0.113,
+            ('home_row', 'same_row'): -0.112,
+            ('dont_cross_home', 'fingers'): -0.111,
+            
+            # Default for no features
+            (): 0.0
+        }
+
+    def score_bigram(self, char1, char2):
+        """Score a single bigram according to the 9 Dvorak criteria."""
+        # Use the existing dvorak_9_criteria_bigrams function
+        return dvorak_9_criteria_bigrams(char1 + char2)
+
+    def _identify_combination(self, bigram_scores, threshold=0.8):
+        """
+        Identify which feature combination a bigram exhibits.
+        
+        Args:
+            bigram_scores: Dict of feature scores for a single bigram
+            threshold: Minimum score to consider a feature "active"
+        
+        Returns:
+            Tuple of active feature names, sorted for consistent lookup
+        """
+        active_features = []
+        
+        for feature, score in bigram_scores.items():
+            if score >= threshold:
+                active_features.append(feature)
+        
+        return tuple(sorted(active_features))
+
+    def _score_bigram_weighted(self, bigram_scores):
+        """
+        Score a single bigram using empirical combination-specific weights.
+        
+        Args:
+            bigram_scores: Dict of 9 feature scores for the bigram
+        
+        Returns:
+            Weighted score for this bigram
+        """
+        # Identify which combination this bigram exhibits
+        combination = self._identify_combination(bigram_scores)
+        
+        # Try to find exact match first
+        if combination in self.combination_weights:
+            weight = self.combination_weights[combination]
+            # Calculate combination strength (how well does bigram exhibit this combination)
+            if combination:
+                combination_strength = sum(bigram_scores[feature] for feature in combination) / len(combination)
+            else:
+                combination_strength = 0
+            return weight * combination_strength
+        
+        # Fall back to best partial match or individual features
+        best_weight = 0.0
+        best_score = 0.0
+        
+        for combo, weight in self.combination_weights.items():
+            if not combo:  # Skip empty combination
+                continue
+                
+            # Check if this bigram exhibits this combination (partial match allowed)
+            if all(feature in bigram_scores for feature in combo):
+                combo_strength = sum(bigram_scores[feature] for feature in combo) / len(combo)
+                
+                # Penalize partial matches
+                active_features = set(self._identify_combination(bigram_scores))
+                match_completeness = len(set(combo) & active_features) / len(combo)
+                adjusted_score = weight * combo_strength * match_completeness
+                
+                if abs(adjusted_score) > abs(best_score):
+                    best_score = adjusted_score
+        
+        return best_score
+
+    def calculate_scores(self):
+        """Calculate layout score using empirical combination weighting."""
+        if not self.bigrams:
+            return {
+                'total_weighted_score': 0.0,
+                'average_weighted_score': 0.0,
+                'bigram_count': 0,
+                'combination_breakdown': {},
+                'bigram_details': [],
+                'weights_source': 'none'
+            }
+        
+        total_weighted_score = 0.0
+        combination_counts = defaultdict(int)
+        combination_score_sums = defaultdict(float)
+        bigram_details = []
+        
+        # Score each bigram with empirical weighting
+        for char1, char2 in self.bigrams:
+            bigram_scores = self.score_bigram(char1, char2)
+            weighted_score = self._score_bigram_weighted(bigram_scores)
+            combination = self._identify_combination(bigram_scores)
+            
+            total_weighted_score += weighted_score
+            combination_counts[combination] += 1
+            combination_score_sums[combination] += weighted_score
+            
+            bigram_details.append({
+                'bigram': f"{char1}{char2}",
+                'scores': bigram_scores,
+                'combination': combination,
+                'weighted_score': weighted_score
+            })
+        
+        # Calculate combination breakdown
+        combination_breakdown = {}
+        for combo, count in combination_counts.items():
+            combination_breakdown[combo] = {
+                'count': count,
+                'total_contribution': combination_score_sums[combo],
+                'average_score': combination_score_sums[combo] / count if count > 0 else 0,
+                'percentage': count / len(self.bigrams) * 100
+            }
+        
+        return {
+            'total_weighted_score': total_weighted_score,
+            'average_weighted_score': total_weighted_score / len(self.bigrams),
+            'bigram_count': len(self.bigrams),
+            'combination_breakdown': combination_breakdown,
+            'bigram_details': bigram_details,
+            'weights_source': 'empirical' if len(self.combination_weights) > 10 else 'fallback'
+        }
+
+    def get_weights_summary(self):
+        """Get summary of the weights being used."""
+        print(f"\n📊 EMPIRICAL WEIGHTS SUMMARY:")
+        print(f"   Total combinations with weights: {len(self.combination_weights)}")
+        
+        # Group by k-way
+        by_k_way = defaultdict(list)
+        for combo, weight in self.combination_weights.items():
+            k = len(combo) if combo else 0
+            by_k_way[k].append((combo, weight))
+        
+        for k in sorted(by_k_way.keys()):
+            combos = by_k_way[k]
+            support_dvorak = sum(1 for _, w in combos if w < 0)
+            contradict_dvorak = sum(1 for _, w in combos if w > 0)
+            
+            print(f"   {k}-way combinations: {len(combos)} total")
+            print(f"     • Support Dvorak (negative): {support_dvorak}")
+            print(f"     • Contradict Dvorak (positive): {contradict_dvorak}")
+            
+            # Show strongest in this category
+            strongest = max(combos, key=lambda x: abs(x[1]))
+            combo_str = ' + '.join(strongest[0]) if strongest[0] else 'none'
+            direction = "supports" if strongest[1] < 0 else "contradicts"
+            print(f"     • Strongest: {combo_str} ({strongest[1]:.4f}, {direction} Dvorak)")
+
+def print_scoring_results(results):
+    """Print formatted scoring results with empirical weight information."""
+    print("Empirical Dvorak-9 Scoring Results")
+    print("=" * 60)
+    
+    print(f"Total Weighted Score: {results['total_weighted_score']:8.3f}")
+    print(f"Average per Bigram:   {results['average_weighted_score']:8.3f}")
+    print(f"Bigrams Analyzed:     {results['bigram_count']:8d}")
+    print(f"Weights Source:       {results['weights_source']}")
+    
+    if results['combination_breakdown']:
+        print("\nCombination Breakdown:")
+        print("-" * 60)
+        print(f"{'Combination':<35} {'Count':<8} {'Contrib':<10} {'%':<6}")
+        print("-" * 60)
+        
+        # Sort by absolute contribution
+        sorted_combos = sorted(results['combination_breakdown'].items(), 
+                              key=lambda x: abs(x[1]['total_contribution']), 
+                              reverse=True)
+        
+        for combo, stats in sorted_combos[:10]:  # Top 10 combinations
+            combo_str = '+'.join(combo) if combo else 'none'
+            if len(combo_str) > 34:
+                combo_str = combo_str[:31] + '...'
+            
+            print(f"{combo_str:<35} {stats['count']:<8} {stats['total_contribution']:<10.3f} {stats['percentage']:<6.1f}")
 
 def verify_frequency_data(freq_df):
     """Verify and display frequency data information"""
@@ -389,7 +691,6 @@ def create_diagnostic_plots(model_info, output_dir='plots'):
     ax3.legend()
     
     # Plot 4: Q-Q plot for normality check
-    from scipy import stats as scipy_stats
     scipy_stats.probplot(residuals, dist="norm", plot=ax4)
     ax4.set_title('Q-Q Plot (Normality Check)')
     ax4.grid(True, alpha=0.3)
@@ -548,6 +849,14 @@ def analyze_correlations(sequences, times, criteria_names, group_name, analysis_
     
     print_and_log(f"  {analysis_type.replace('_', ' ').title()} Analysis:")
     
+    # Define group_suffix EARLY based on group_name
+    if "No Middle" in group_name:
+        group_suffix = "no_middle"
+    elif "With Middle" in group_name:
+        group_suffix = "with_middle"
+    else:
+        group_suffix = "unknown"
+    
     # Calculate scores for all sequences
     print_and_log(f"  Calculating Dvorak scores for {len(sequences):,} sequences...")
     
@@ -578,7 +887,7 @@ def analyze_correlations(sequences, times, criteria_names, group_name, analysis_
                 sequence_score_record[criterion] = score
             sequence_scores_data.append(sequence_score_record)
             
-            # Debug: Show sample scores for first few sequences
+            # Show sample scores for first few sequences
             if len(valid_sequences) <= 3:
                 sample_scores = {k: f"{v:.3f}" for k, v in scores.items()}
                 print_and_log(f"      Sample scores for '{seq}': {sample_scores}")
@@ -604,13 +913,6 @@ def analyze_correlations(sequences, times, criteria_names, group_name, analysis_
                 unique_scores = len(set(scores_list))
                 if unique_scores <= 1:
                     print_and_log(f"    Warning: {criterion} has constant scores ({unique_scores} unique values)")
-
-                    if "No Middle" in group_name:
-                        group_suffix = "no_middle"
-                    elif "With Middle" in group_name:
-                        group_suffix = "with_middle"
-                    else:
-                        group_suffix = "unknown"
 
                     result_key = f"{criterion}_{group_suffix}_{analysis_type}"
 
@@ -666,7 +968,7 @@ def analyze_correlations(sequences, times, criteria_names, group_name, analysis_
             except Exception as e:
                 print_and_log(f"    Error calculating correlation for {criterion}: {e}")
                 # Store error information
-                result_key = f"{criterion}_{analysis_type}"
+                result_key = f"{criterion}_{group_suffix}_{analysis_type}"
                 results[result_key] = {
                     'name': criteria_names[criterion],
                     'group': f"{group_name} ({analysis_type.replace('_', ' ')})",
@@ -720,22 +1022,7 @@ def analyze_correlations(sequences, times, criteria_names, group_name, analysis_
     return results
 
 def analyze_bigram_data(bigrams, freq_df, middle_column_keys):
-    """Analyze bigram typing data with middle column key analysis and diagnostics"""
-    
-    # Split data by middle column usage
-    with_middle = []
-    without_middle = []
-    
-    for bigram, time_val in bigrams:
-        has_middle = any(char in middle_column_keys for char in bigram.lower())
-        if has_middle:
-            with_middle.append((bigram, time_val))
-        else:
-            without_middle.append((bigram, time_val))
-    
-    print_and_log(f"Data split:")
-    print_and_log(f"  With middle columns: {len(with_middle):,} bigrams")
-    print_and_log(f"  Without middle columns: {len(without_middle):,} bigrams")
+    """Analyze bigram typing data with middle column key analysis"""
     
     criteria_names = {
         'hands': 'hands',
@@ -749,21 +1036,42 @@ def analyze_bigram_data(bigrams, freq_df, middle_column_keys):
         'strong_fingers': 'strong fingers'
     }
     
-    all_results = {}
+    # FIX: ADD THE MISSING BIGRAM SPLITTING LOGIC
+    print_and_log(f"Splitting {len(bigrams):,} bigrams by middle column key usage...")
     
-    # Analyze each group
+    without_middle = []
+    with_middle = []
+    
+    for bigram, time in bigrams:
+        # Check if bigram contains any middle column keys
+        if any(char in middle_column_keys for char in bigram.lower()):
+            with_middle.append((bigram, time))
+        else:
+            without_middle.append((bigram, time))
+    
+    print_and_log(f"✅ Bigrams without middle columns: {len(without_middle):,}")
+    print_and_log(f"✅ Bigrams with middle columns: {len(with_middle):,}")
+    
+    all_results = {}
+    MIN_SEQUENCES = 3
+    
+    # Now analyze each group (rest of function continues as before)
     for group_data, group_name in [(without_middle, "Bigrams (No Middle Columns)"), 
                                    (with_middle, "Bigrams (With Middle Columns)")]:
-        if len(group_data) < 10:
-            print_and_log(f"\n--- Skipping {group_name} (too few sequences: {len(group_data)}) ---")
-            continue
-            
+        
         print_and_log(f"\n--- Analyzing {group_name} ---")
+        print_and_log(f"Group size: {len(group_data):,} bigrams")
+        
+        if len(group_data) < MIN_SEQUENCES:
+            print_and_log(f"❌ SKIPPING {group_name}: only {len(group_data)} bigrams (need ≥{MIN_SEQUENCES})")
+            print_and_log(f"   This group will NOT appear in FDR analysis!")
+            continue
+        
+        print_and_log(f"✅ ANALYZING {group_name}: {len(group_data):,} bigrams")
         
         sequences = [item[0] for item in group_data]
         times = [item[1] for item in group_data]
         
-        print_and_log(f"Sequences: {len(sequences):,}")
         print_and_log(f"Examples: {', '.join(sequences[:5])}")
         
         # Raw analysis (no frequency adjustment)
@@ -902,9 +1210,6 @@ def print_correlation_results_with_frequency(results, analysis_name):
 
 def create_frequency_comparison_plots(results, output_dir='plots'):
     """Create visualization comparing raw vs frequency-adjusted correlations"""
-    import matplotlib.pyplot as plt
-    import numpy as np
-    
     # Create output directory
     Path(output_dir).mkdir(exist_ok=True)
     
@@ -1149,7 +1454,6 @@ def create_combination_performance_plots(combination_results, output_dir='plots'
                 effect_categories.append('Negligible (<0.1)')
         
         # Count effect sizes
-        from collections import Counter
         effect_counts = Counter(effect_categories)
         
         # Create pie chart
@@ -1399,7 +1703,7 @@ def create_criterion_interaction_heatmap(combination_results, output_dir='plots'
     return output_path
 
 def interpret_correlation_results(results, analysis_name):
-    """Provide interpretation of correlation results - FIXED VERSION"""
+    """Provide interpretation of correlation results"""
     
     print_and_log(f"\n" + "=" * 80)
     print_and_log(f"📊 RESULTS INTERPRETATION {analysis_name.upper()}")
@@ -1579,7 +1883,7 @@ def interpret_correlation_results(results, analysis_name):
     print_and_log(f"   • All effects are small/negligible (|r| < 0.1) - typical for typing research")
 
 def analyze_criterion_combinations(results):
-    """Analyze how combinations of criteria predict typing speed - FIXED TO USE FREQUENCY-ADJUSTED DATA"""
+    """Analyze how combinations of criteria predict typing speed"""
     
     print_and_log(f"\n" + "=" * 80)
     print_and_log(f"COMPREHENSIVE CRITERION COMBINATION ANALYSIS")
@@ -1660,7 +1964,6 @@ def analyze_criterion_combinations(results):
             print_and_log(f"\n📊 {k}-WAY COMBINATIONS:")
             
             # Generate ALL combinations of size k
-            from itertools import combinations
             combos = list(combinations(criteria_cols, k))
             total_combos = len(combos)
             print_and_log(f"   Testing ALL {total_combos:,} combinations of {k} criteria...")
@@ -1869,98 +2172,8 @@ def filter_bigrams_by_time(bigrams, min_time=50, max_time=2000):
     
     return filtered_bigrams
 
-def debug_results_structure(results):
-    """Debug function to understand the results structure"""
-    
-    print_and_log("\n🔍 DEBUGGING RESULTS STRUCTURE")
-    print_and_log("=" * 60)
-    
-    # Show all keys
-    print_and_log(f"Total keys in results: {len(results)}")
-    
-    # Categorize keys
-    freq_adjusted_keys = []
-    raw_keys = []
-    internal_keys = []
-    other_keys = []
-    
-    for key in sorted(results.keys()):
-        if key.startswith('_'):
-            internal_keys.append(key)
-        elif key.endswith('_freq_adjusted'):
-            freq_adjusted_keys.append(key)
-        elif key.endswith('_raw'):
-            raw_keys.append(key)
-        else:
-            other_keys.append(key)
-    
-    print_and_log(f"\nKEY CATEGORIES:")
-    print_and_log(f"  Frequency-adjusted keys: {len(freq_adjusted_keys)}")
-    for key in freq_adjusted_keys:
-        data = results[key]
-        if isinstance(data, dict):
-            group = data.get('group', 'NO_GROUP')
-            has_spearman = 'spearman_r' in data
-            spearman_val = data.get('spearman_r', 'N/A')
-            print_and_log(f"    {key}")
-            print_and_log(f"      → group: '{group}'")
-            print_and_log(f"      → has spearman_r: {has_spearman}")
-            print_and_log(f"      → spearman_r: {spearman_val}")
-        else:
-            print_and_log(f"    {key} → {type(data)}")
-    
-    print_and_log(f"\n  Raw keys: {len(raw_keys)}")
-    for key in raw_keys[:3]:  # Show first 3
-        print_and_log(f"    {key}")
-    if len(raw_keys) > 3:
-        print_and_log(f"    ... and {len(raw_keys)-3} more")
-    
-    print_and_log(f"\n  Internal keys: {len(internal_keys)}")
-    for key in internal_keys:
-        print_and_log(f"    {key}")
-    
-    print_and_log(f"\n  Other keys: {len(other_keys)}")
-    for key in other_keys:
-        print_and_log(f"    {key}")
-    
-    # Check for the specific issue: group patterns
-    print_and_log(f"\nGROUP ANALYSIS:")
-    unique_groups = set()
-    
-    for key, data in results.items():
-        if isinstance(data, dict) and 'group' in data:
-            unique_groups.add(data['group'])
-    
-    print_and_log(f"  Unique groups found: {len(unique_groups)}")
-    for group in sorted(unique_groups):
-        print_and_log(f"    '{group}'")
-        
-        # Count criteria in this group
-        criteria_count = 0
-        freq_adj_count = 0
-        for key, data in results.items():
-            if isinstance(data, dict) and data.get('group') == group:
-                criteria_count += 1
-                if key.endswith('_freq_adjusted'):
-                    freq_adj_count += 1
-        
-        print_and_log(f"      → Total criteria: {criteria_count}")
-        print_and_log(f"      → Freq-adjusted criteria: {freq_adj_count}")
-    
-    # Expected groups check
-    expected_groups = [
-        "Bigrams (No Middle Columns)",
-        "Bigrams (With Middle Columns)"
-    ]
-    
-    print_and_log(f"\nEXPECTED VS ACTUAL:")
-    for expected in expected_groups:
-        found_variations = [g for g in unique_groups if expected in g]
-        print_and_log(f"  Expected: '{expected}'")
-        print_and_log(f"  Found variations: {found_variations}")
-
 def analyze_all_results_with_fdr(results, combination_results=None):
-    """Complete FDR analysis for all groups and combinations - UPDATED FOR NEW KEY FORMAT"""
+    """Complete FDR analysis for all groups and combinations"""
     
     print_and_log(f"\n" + "=" * 100)
     print_and_log("🎯 COMPLETE FDR-CORRECTED ANALYSIS")
@@ -1973,7 +2186,7 @@ def analyze_all_results_with_fdr(results, combination_results=None):
     print_and_log("📊 PART 1: INDIVIDUAL CRITERIA (9 TESTS PER GROUP)")
     print_and_log("=" * 60)
     
-    # Updated group detection for new key format
+    # Group detection for new key format
     groups = {}
     for key, data in results.items():
         # Look for frequency-adjusted keys with the new naming scheme
@@ -2035,14 +2248,13 @@ def analyze_all_results_with_fdr(results, combination_results=None):
         
         # Apply FDR correction within this group
         if p_values:
-            from statsmodels.stats.multitest import multipletests
             rejected, p_adj, _, _ = multipletests(p_values, alpha=0.05, method='fdr_bh')
             
             # Create results with correction
             group_results = []
             for i, (key, data) in enumerate(group_data):
                 result = {
-                    'key': key,  # Store the actual key for debugging
+                    'key': key,  
                     'group': group_name,
                     'criterion': data['name'],
                     'correlation': data['spearman_r'],
@@ -2121,7 +2333,6 @@ def analyze_all_results_with_fdr(results, combination_results=None):
         # Apply FDR correction to ALL combinations
         if all_combinations:
             p_values = [r['p_value'] for r in all_combinations]
-            from statsmodels.stats.multitest import multipletests
             rejected, p_adj, _, _ = multipletests(p_values, alpha=0.05, method='fdr_bh')
             
             # Add FDR results
@@ -2131,7 +2342,6 @@ def analyze_all_results_with_fdr(results, combination_results=None):
                 result['supports_dvorak'] = result['correlation'] < 0
             
             # SAVE TO CSV FILE
-            import pandas as pd
             combination_df = pd.DataFrame(all_combinations)
             csv_filename = 'dvorak_combinations_fdr_results.csv'
             combination_df.to_csv(csv_filename, index=False)
@@ -2174,7 +2384,7 @@ def analyze_all_results_with_fdr(results, combination_results=None):
         else:
             print_and_log("❌ No combination results found!")
     
-    # PART 3: SUMMARY COMPARISON - FIXED EFFECT SIZE CLASSIFICATION
+    # PART 3: SUMMARY COMPARISON
     print_and_log(f"\n📊 PART 3: SUMMARY COMPARISON")
     print_and_log("=" * 60)
     
@@ -2236,13 +2446,225 @@ def analyze_all_results_with_fdr(results, combination_results=None):
     
     return all_individual_results, significant_combinations if 'significant_combinations' in locals() else []
 
+def get_combination_weights():
+    """Return weights for different feature combinations based on empirical analysis."""
+    return {
+        # 5-way combinations (strongest)
+        ('fingers', 'same_row', 'home_row', 'strum', 'strong_fingers'): -0.148,
+        
+        # 4-way combinations
+        ('fingers', 'same_row', 'home_row', 'strum'): -0.147,
+        ('fingers', 'same_row', 'home_row', 'strong_fingers'): -0.141,
+        ('fingers', 'same_row', 'strum', 'strong_fingers'): -0.138,
+        
+        # 3-way combinations (most robust)
+        ('fingers', 'same_row', 'strum'): -0.124,
+        ('fingers', 'same_row', 'home_row'): -0.119,
+        ('fingers', 'strum', 'strong_fingers'): -0.115,
+        
+        # 2-way combinations
+        ('fingers', 'same_row'): -0.106,
+        ('fingers', 'strum'): -0.102,
+        ('same_row', 'strum'): -0.098,
+        
+        # Individual features (base effects)
+        ('fingers',): -0.088,
+        ('strum',): -0.087,
+        ('same_row',): -0.088,
+        ('home_row',): -0.058,
+        ('strong_fingers',): -0.045,
+        ('skip_fingers',): -0.038,
+        ('columns',): -0.025,
+        ('dont_cross_home',): -0.018,
+        ('hands',): +0.090,  # Positive = bad for typing speed
+        
+        # Default for no features
+        (): 0.0
+    }
+
+def identify_bigram_combination(bigram_scores, threshold=0.8):
+    """
+    Identify which feature combination a bigram exhibits.
+    
+    Args:
+        bigram_scores: Dict of feature scores for a single bigram
+        threshold: Minimum score to consider a feature "active"
+    
+    Returns:
+        Tuple of active feature names, sorted for consistent lookup
+    """
+    active_features = []
+    
+    for feature, score in bigram_scores.items():
+        if score >= threshold:
+            active_features.append(feature)
+    
+    return tuple(sorted(active_features))
+
+def score_bigram_weighted(bigram_scores, combination_weights):
+    """
+    Score a single bigram using combination-specific weights.
+    
+    Args:
+        bigram_scores: Dict of 9 feature scores for the bigram
+        combination_weights: Dict mapping combinations to empirical weights
+    
+    Returns:
+        Weighted score for this bigram
+    """
+    # Identify which combination this bigram exhibits
+    combination = identify_bigram_combination(bigram_scores)
+    
+    # Try to find exact match first
+    if combination in combination_weights:
+        weight = combination_weights[combination]
+        # Calculate combination strength (how well does bigram exhibit this combination)
+        combination_strength = sum(bigram_scores[feature] for feature in combination) / len(combination) if combination else 0
+        return weight * combination_strength
+    
+    # Fall back to best partial match
+    best_weight = 0.0
+    best_score = 0.0
+    
+    for combo, weight in combination_weights.items():
+        if not combo:  # Skip empty combination
+            continue
+            
+        # Check if this bigram exhibits this combination (partial match allowed)
+        if all(feature in bigram_scores for feature in combo):
+            combo_strength = sum(bigram_scores[feature] for feature in combo) / len(combo)
+            
+            # Penalize partial matches
+            match_completeness = len(set(combo) & set(identify_bigram_combination(bigram_scores))) / len(combo)
+            adjusted_score = weight * combo_strength * match_completeness
+            
+            if abs(adjusted_score) > abs(best_score):
+                best_score = adjusted_score
+    
+    return best_score
+
+def print_combination_results(results):
+    """Print formatted results from combination scoring."""
+    print("Dvorak-9 Combination Scoring Results")
+    print("=" * 70)
+    
+    print(f"Total Weighted Score: {results['total_weighted_score']:8.3f}")
+    print(f"Average per Bigram:   {results['average_weighted_score']:8.3f}")
+    print(f"Bigrams Analyzed:     {results['bigram_count']:8d}")
+    
+    print("\nCombination Breakdown:")
+    print("-" * 70)
+    print(f"{'Combination':<35} {'Count':<8} {'Contrib':<10} {'Avg':<8} {'%':<6}")
+    print("-" * 70)
+    
+    # Sort by total contribution
+    sorted_combos = sorted(results['combination_breakdown'].items(), 
+                          key=lambda x: abs(x[1]['total_contribution']), 
+                          reverse=True)
+    
+    for combo, stats in sorted_combos[:15]:  # Top 15 combinations
+        combo_str = '+'.join(combo) if combo else 'none'
+        if len(combo_str) > 34:
+            combo_str = combo_str[:31] + '...'
+        
+        print(f"{combo_str:<35} {stats['count']:<8} {stats['total_contribution']:<10.3f} "
+              f"{stats['average_score']:<8.3f} {stats['percentage']:<6.1f}")
+
+def analyze_weight_distribution(csv_file="dvorak_combinations_fdr_results.csv"):
+    """Analyze the distribution of weights in the empirical data."""
+    print(f"\n📈 ANALYZING EMPIRICAL WEIGHT DISTRIBUTION")
+    print("=" * 60)
+    
+    try:
+        df = pd.read_csv(csv_file)
+        
+        # Filter to significant results
+        if 'significant_after_fdr' in df.columns:
+            sig_df = df[df['significant_after_fdr'] == True]
+        else:
+            sig_df = df[df['p_value'] < 0.05]
+        
+        print(f"Significant combinations: {len(sig_df)}/{len(df)} ({len(sig_df)/len(df)*100:.1f}%)")
+        
+        # Analyze by k-way
+        sig_df['k_way'] = sig_df['k_way'].astype(int)
+        
+        print(f"\nBy combination size:")
+        for k in sorted(sig_df['k_way'].unique()):
+            k_data = sig_df[sig_df['k_way'] == k]
+            support = sum(k_data['supports_dvorak'])
+            contradict = len(k_data) - support
+            
+            best_support = k_data[k_data['supports_dvorak']]['abs_correlation'].max() if support > 0 else 0
+            best_contradict = k_data[~k_data['supports_dvorak']]['abs_correlation'].max() if contradict > 0 else 0
+            
+            print(f"  {k}-way: {len(k_data)} significant")
+            print(f"    Support Dvorak: {support} (best |r|={best_support:.4f})")
+            print(f"    Contradict Dvorak: {contradict} (best |r|={best_contradict:.4f})")
+        
+        # Overall statistics
+        print(f"\nOverall correlation statistics:")
+        print(f"  Range: {sig_df['correlation'].min():.4f} to {sig_df['correlation'].max():.4f}")
+        print(f"  Mean: {sig_df['correlation'].mean():.4f}")
+        print(f"  Std: {sig_df['correlation'].std():.4f}")
+        
+        dvorak_support = sum(sig_df['supports_dvorak'])
+        print(f"  Support Dvorak: {dvorak_support}/{len(sig_df)} ({dvorak_support/len(sig_df)*100:.1f}%)")
+        
+    except Exception as e:
+        print(f"❌ Error analyzing weights: {e}")
+
+def test_empirical_scorer():
+    """Test the empirical scorer with real weights."""
+    print("Testing Empirical Dvorak-9 Scorer")
+    print("=" * 50)
+    
+    # Test layout (partial DVORAK)
+    layout_mapping = {
+        'e': 'D', 't': 'K', 'a': 'A', 'o': 'S', 'i': 'F', 
+        'n': 'J', 's': 'R', 'h': 'U', 'r': 'L', 'd': 'G'
+    }
+    text = "the rain in spain falls mainly on the plain"
+    
+    # Initialize with empirical weights
+    scorer = Dvorak9Scorer(layout_mapping, text)
+    results = scorer.calculate_scores()
+    
+    # Show weights summary
+    scorer.get_weights_summary()
+    
+    # Show scoring results
+    print()
+    print_scoring_results(results)
+    
+    # Show detailed bigram analysis
+    print(f"\nDetailed Bigram Analysis (first 10):")
+    print("-" * 60)
+    for detail in results['bigram_details'][:10]:
+        combo_str = '+'.join(detail['combination']) if detail['combination'] else 'none'
+        print(f"'{detail['bigram']}': {combo_str:<25} → {detail['weighted_score']:>7.4f}")
+
 def main():
     """Main analysis function"""
     parser = argparse.ArgumentParser(description='Analyze Dvorak-9 criteria correlations with typing speed')
     parser.add_argument('--max-bigrams', type=int, help='Maximum number of bigrams to analyze')
     parser.add_argument('--random-seed', type=int, default=42, help='Random seed for reproducibility')
-    parser.add_argument('--progress-interval', type=int, default=1000, help='Progress reporting interval')
+    parser.add_argument('--test-scorer', action='store_true', help='Test the scorer on sample data')
     args = parser.parse_args()
+    
+    if args.test_scorer:
+        # Test the unified scorer
+        print_and_log("Testing Dvorak-9 Scorer")
+        print_and_log("=" * 50)
+        
+        layout_mapping = {'e': 'D', 't': 'K', 'a': 'A', 'o': 'S', 'i': 'F', 'n': 'J', 's': 'R', 'h': 'U', 'r': 'L'}
+        text = "the quick brown fox jumps over the lazy dog"
+        
+        scorer = Dvorak9Scorer(layout_mapping, text)
+        results = scorer.calculate_scores()
+        
+        print_scoring_results(results)
+        return
     
     # Set random seed
     random.seed(args.random_seed)
@@ -2260,11 +2682,10 @@ def main():
     print_and_log("=" * 80)
     print_and_log("Configuration:")
     print_and_log(f"  Max bigrams: {args.max_bigrams:,}" if args.max_bigrams else "  Max bigrams: unlimited")
-    print_and_log(f"  Progress interval: {args.progress_interval:,}")
     print_and_log(f"  Random seed: {args.random_seed}")
     print_and_log(f"  Middle column keys: {', '.join(sorted(middle_column_keys))}")
     print_and_log("  Analysis includes both raw and frequency-adjusted correlations")
-    print_and_log("  Focus: Bigram-level analysis only (word analysis removed)")
+    print_and_log("  Using empirical combination weights from FDR analysis")
     print_and_log("")
     
     # Load frequency data
@@ -2296,54 +2717,28 @@ def main():
     print_and_log(f"\nBIGRAM ANALYSIS")
     bigram_start = time.time()
     
-    print_and_log(f"Processing {len(bigrams):,} bigrams...")
-    print_and_log("Analyzing bigram correlations with frequency control...")
-    print_and_log(f"Total bigrams: {len(bigrams)}")
-    print_and_log(f"Middle column keys: {', '.join(sorted(middle_column_keys))}")
-    print_and_log("")
-    
     bigram_results = analyze_bigram_data(bigrams, freq_df, middle_column_keys)
     
     bigram_elapsed = time.time() - bigram_start
     print_and_log(f"Bigram analysis completed in {format_time(bigram_elapsed)}")
-    
-    total_elapsed = time.time() - start_time
-    print_and_log(f"\nTotal analysis time: {format_time(total_elapsed)}")
     
     # Print results with frequency comparison
     print_correlation_results_with_frequency(bigram_results, "BIGRAM")
     
     # Create plots
     print_and_log(f"\nGenerating comparison plots...")
-    plot_start = time.time()
-    
     create_frequency_comparison_plots(bigram_results)
-    
-    plot_elapsed = time.time() - plot_start
-    print_and_log(f"Plot generation completed in {format_time(plot_elapsed)}")
     
     # Generate interpretation
     print_and_log(f"\nGenerating results interpretation...")
-    interp_start = time.time()
-    
     interpret_correlation_results(bigram_results, "BIGRAM ANALYSIS")
     
-    interp_elapsed = time.time() - interp_start
-    print_and_log(f"Interpretation completed in {format_time(interp_elapsed)}")
-    
-    # Analyze criterion combinations (modified to return results)
+    # Analyze criterion combinations
     print_and_log(f"\nAnalyzing criterion combinations...")
-    combo_start = time.time()
-    
     combination_results = analyze_criterion_combinations(bigram_results)
     
-    combo_elapsed = time.time() - combo_start
-    print_and_log(f"Combination analysis completed in {format_time(combo_elapsed)}")
-    
-    # COMPLETE FDR ANALYSIS (replaces the old multiple comparisons section)
+    # COMPLETE FDR ANALYSIS
     if bigram_results:
-        debug_results_structure(bigram_results)
-
         analyze_all_results_with_fdr(bigram_results, combination_results)
 
     # Final summary
@@ -2353,34 +2748,31 @@ def main():
     print_and_log("ANALYSIS COMPLETE")
     print_and_log("=" * 80)
     print_and_log(f"Total runtime: {format_time(total_elapsed)}")
-    print_and_log(f"Key outputs saved:")
-    print_and_log(f"- Text output: test_dvorak9_speed_results.txt")
-    print_and_log(f"- Comparison plots: plots/dvorak9_frequency_comparison.png")
-    print_and_log(f"- Bigram-level analysis with and without frequency control")
-    print_and_log(f"- Complete interpretation and criterion combination analysis")
-    
-    # Summary statistics
-    if bigram_results:
-        total_correlations = len([k for k in bigram_results.keys() if not k.startswith('_') and isinstance(bigram_results[k], dict)])
-        valid_correlations = len([k for k, v in bigram_results.items() 
-                                if not k.startswith('_') and isinstance(v, dict) 
-                                and 'spearman_r' in v and not np.isnan(v['spearman_r'])])
-        nan_correlations = total_correlations - valid_correlations
-        
-        print_and_log(f"\nAnalysis Summary:")
-        print_and_log(f"- Total correlation tests: {total_correlations}")
-        print_and_log(f"- Valid correlations: {valid_correlations}")
-        print_and_log(f"- Failed/NaN correlations: {nan_correlations}")
-        
-        if nan_correlations > 0:
-            print_and_log(f"- Note: NaN correlations typically result from constant criterion scores")
-    
-    if args.max_bigrams:
-        print_and_log(f"\nNote: Analysis used sample limit:")
-        print_and_log(f"- Bigrams: {args.max_bigrams:,} (from {len(bigrams):,} processed)")
+    print_and_log(f"Dvorak-9 Analysis Complete")
+    print_and_log("Now using unified scorer with empirical combination weighting")
     
     # Save log
     save_log()
 
 if __name__ == "__main__":
-    main()
+
+    # Check if we want to run tests or full analysis
+    if len(sys.argv) > 1 and sys.argv[1] == "--test-weights":
+        # Analyze the weight distribution
+        analyze_weight_distribution()
+        
+        # Test the scorer
+        test_empirical_scorer()
+    else:
+        # Run the full analysis
+        main()
+    # Check if we want to run tests or full analysis
+    if len(sys.argv) > 1 and sys.argv[1] == "--test":
+        # Analyze the weight distribution
+        analyze_weight_distribution()
+        
+        # Test the scorer
+        test_empirical_scorer()
+    else:
+        # Run the full analysis
+        main()
