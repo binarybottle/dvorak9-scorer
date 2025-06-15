@@ -1,0 +1,165 @@
+> poetry run python3 test_dvorak9.py
+Dvorak-9 Comprehensive Scoring Test
+==================================================
+
+=== SPECIFIC TEST CASES ===
+
+Same finger strum: F→F
+  ✓ strum: expected 0.0, got 0.0
+  ✓ All checks passed
+
+Different hands: F→J
+  ✓ strum: expected 1.0, got 1.0
+  ✓ hands: expected 1.0, got 1.0
+  ✓ All checks passed
+
+Inward roll (L): A→F
+  ✓ strum: expected 1.0, got 1.0
+  ✓ All checks passed
+
+Outward roll (L): F→A
+  ✓ strum: expected 0.0, got 0.0
+  ✓ All checks passed
+
+Same finger: F→F
+  ✓ skip_fingers: expected 0.0, got 0.0
+  ✓ All checks passed
+
+Adjacent fingers: F→D
+  ✓ skip_fingers: expected 0.0, got 0.0
+  ✓ All checks passed
+
+Skip 1 finger: F→S
+  ✓ skip_fingers: expected 0.5, got 0.5
+  ✓ All checks passed
+
+Skip 2 fingers: F→A
+  ✓ skip_fingers: expected 1.0, got 1.0
+  ✓ All checks passed
+
+Different hands: F→J
+  ✓ skip_fingers: expected 1.0, got 1.0
+  ✓ All checks passed
+
+Same hand hurdling: Q→Z
+  ✓ dont_cross_home: expected 0.0, got 0.0
+  ✓ All checks passed
+
+Different hands hurdling: Q→M
+  ✓ dont_cross_home: expected 1.0, got 1.0
+  ✓ All checks passed
+
+Same hand no hurdling: Q→A
+  ✓ dont_cross_home: expected 1.0, got 1.0
+  ✓ All checks passed
+
+Both home row: F→J
+  ✓ home_row: expected 1.0, got 1.0
+  ✓ All checks passed
+
+One home row: F→R
+  ✓ home_row: expected 0.5, got 0.5
+  ✓ All checks passed
+
+Neither home row: Q→Z
+  ✓ home_row: expected 0.0, got 0.0
+  ✓ All checks passed
+
+==================================================
+Testing all possible bigrams...
+Testing 30 keys = 900 possible bigrams
+All bigrams written to dvorak9_all_bigrams.csv
+Unique score patterns written to dvorak9_unique_scores.csv
+Total bigrams: 900
+Unique score combinations: 104
+
+=== SCORE PATTERN ANALYSIS ===
+Found 104 unique score patterns:
+
+Pattern 1 (64 bigrams): (1.0, 1.0, 1.0, 1.0, 0.0, 0.5, 1.0, 1.0, 0.5)
+  Total score: 7.0
+  Examples: QJ, QK, WJ, WK, EL, E;, RL, R;...
+
+Pattern 2 (32 bigrams): (1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.5)
+  Total score: 7.5
+  Examples: QU, QI, WU, WI, EO, EP, RO, RP...
+
+Pattern 3 (32 bigrams): (1.0, 1.0, 1.0, 1.0, 0.0, 0.5, 0.5, 1.0, 0.5)
+  Total score: 6.5
+  Examples: QH, WH, TL, T;, YA, YS, OG, PG...
+
+Pattern 4 (32 bigrams): (1.0, 1.0, 1.0, 1.0, 0.0, 0.5, 1.0, 1.0, 0.0)
+  Total score: 6.5
+  Examples: QL, Q;, WL, W;, OA, OS, PA, PS...
+
+Pattern 5 (32 bigrams): (1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.5)
+  Total score: 6.5
+  Examples: QM, Q,, WM, W,, E., E/, R., R/...
+
+Pattern 6 (32 bigrams): (1.0, 1.0, 1.0, 1.0, 0.0, 0.5, 0.5, 1.0, 1.0)
+  Total score: 7.0
+  Examples: EH, RH, TJ, TK, YD, YF, UG, IG...
+
+Pattern 7 (32 bigrams): (1.0, 1.0, 1.0, 1.0, 0.0, 0.5, 1.0, 1.0, 1.0)
+  Total score: 7.5
+  Examples: EJ, EK, RJ, RK, UD, UF, ID, IF...
+
+Pattern 8 (16 bigrams): (1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.5, 1.0, 0.5)
+  Total score: 7.0
+  Examples: QY, WY, TO, TP, YQ, YW, OT, PT...
+
+Pattern 9 (16 bigrams): (1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0)
+  Total score: 7.0
+  Examples: QO, QP, WO, WP, OQ, OW, PQ, PW...
+
+Pattern 10 (16 bigrams): (0.0, 0.0, 0.0, 1.0, 0.0, 0.5, 1.0, 0.0, 0.0)
+  Total score: 2.5
+  Examples: QA, WS, OL, P;, AQ, AZ, SW, SX...
+
+=== CRITERION SCORE DISTRIBUTIONS ===
+
+HANDS:
+  0.0:  450 bigrams ( 50.0%)
+  1.0:  450 bigrams ( 50.0%)
+
+FINGERS:
+  0.0:  126 bigrams ( 14.0%)
+  1.0:  774 bigrams ( 86.0%)
+
+SKIP_FINGERS:
+  0.0:  270 bigrams ( 30.0%)
+  0.5:  108 bigrams ( 12.0%)
+  1.0:  522 bigrams ( 58.0%)
+
+DONT_CROSS_HOME:
+  0.0:  100 bigrams ( 11.1%)
+  1.0:  800 bigrams ( 88.9%)
+
+SAME_ROW:
+  0.0:  600 bigrams ( 66.7%)
+  1.0:  300 bigrams ( 33.3%)
+
+HOME_ROW:
+  0.0:  400 bigrams ( 44.4%)
+  0.5:  400 bigrams ( 44.4%)
+  1.0:  100 bigrams ( 11.1%)
+
+COLUMNS:
+  0.0:   36 bigrams (  4.0%)
+  0.5:  288 bigrams ( 32.0%)
+  1.0:  576 bigrams ( 64.0%)
+
+STRUM:
+  0.0:  288 bigrams ( 32.0%)
+  1.0:  612 bigrams ( 68.0%)
+
+STRONG_FINGERS:
+  0.0:  144 bigrams ( 16.0%)
+  0.5:  432 bigrams ( 48.0%)
+  1.0:  324 bigrams ( 36.0%)
+
+==================================================
+Test complete!
+Check these output files:
+  - 'dvorak9_all_bigrams.csv' for all possible bigrams
+  - 'dvorak9_unique_scores.csv' for unique score patterns
