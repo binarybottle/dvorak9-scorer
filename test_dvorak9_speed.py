@@ -1,9 +1,50 @@
 #!/usr/bin/env python3
 """
-Dvorak-9 Criteria Correlation Analysis for Typing Speed
+Comprehensive Empirical Analysis of Dvorak-9 Criteria vs Typing Speed
 
-This script analyzes the correlation between typing speed and the 9 Dvorak criteria,
-with comprehensive frequency adjustment and middle column key analysis.
+This script performs a complete empirical validation of August Dvorak's 9 typing 
+evaluation criteria using real typing data from 136M+ keystrokes. The analysis
+includes frequency adjustment, middle column key effects, and rigorous statistical
+testing with FDR correction.
+
+Key Features:
+- Analyzes correlations between each Dvorak criterion and actual typing speed
+- Controls for English bigram frequency effects using regression
+- Splits analysis by middle column key usage (lateral index finger movements)
+- Tests all 511 possible combinations of criteria (1-way through 9-way)
+- Applies FDR correction for multiple testing (Benjamini-Hochberg)
+- Uses empirical combination weights derived from significant results
+- Generates comprehensive diagnostic plots and visualizations
+- Outputs detailed CSV files with all results for further analysis
+
+Data Requirements:
+- bigram_times.csv: Real typing times for bigrams from correctly typed words
+- letter_pair_frequencies_english.csv: English language bigram frequencies
+
+Statistical Methods:
+- Spearman rank correlation (robust to outliers)
+- Linear regression for frequency adjustment: time ~ log10(frequency)
+- FDR correction using Benjamini-Hochberg procedure
+- Confidence intervals using Fisher z-transformation
+
+The script produces frequency-adjusted residuals that represent typing speed
+after controlling for linguistic frequency effects, enabling fair comparison
+of layout-dependent factors.
+
+The 9 scoring criteria for typing bigrams are:
+1. Hands - favor alternating hands over same hand
+2. Fingers - avoid same finger repetition  
+3. Skip fingers - favor non-adjacent fingers over adjacent (same hand)
+4. Don't cross home - avoid crossing over home row
+5. Same row - favor typing within the same row
+6. Home row - favor using the home row
+7. Columns - favor fingers staying in their designated columns
+8. Strum - favor inward rolls over outward rolls (same hand)
+9. Strong fingers - favor stronger fingers over weaker ones
+
+Example usage:
+    python dvorak9_scorer.py --items "abc" --positions "FDJ" --text "abacaba"
+    python dvorak9_scorer.py --items "etaoinsrhldcumfp" --positions "FDESRJKUMIVLA;OW" --details
 """
 
 import pandas as pd

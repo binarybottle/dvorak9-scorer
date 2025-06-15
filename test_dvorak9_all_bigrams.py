@@ -1,8 +1,24 @@
-# test_dvorak9.py
+# test_dvorak9_all_bigrams.py
 """
-Comprehensive test of Dvorak-9 scoring that analyzes every possible bigram.
-Outputs two CSV files:
-1. All bigrams with their individual scores and metadata
+Comprehensive validation test of Dvorak-9 scoring criteria.
+
+This script systematically tests every possible bigram combination of a QWERTY layout
+to validate that the 9 Dvorak criteria are implemented correctly and produce 
+expected score patterns.
+
+Outputs:
+1. 'dvorak9_scores_all_bigrams.csv' - All possible bigrams with individual scores and metadata
+2. 'dvorak9_scores_unique_all_bigrams.csv' - Unique score patterns with counts and examples
+
+Features:
+- Tests all 841 possible bigrams (29×29 QWERTY keys)
+- Validates specific test cases for each criterion
+- Analyzes score distributions and patterns
+- Identifies criteria with constant or low-variation scores
+- Provides comprehensive debugging output for criterion implementation
+
+Use this script to verify that the Dvorak-9 scoring system is working correctly
+before running empirical analysis on real typing data.
 2. Unique score patterns with counts and examples
 """
 

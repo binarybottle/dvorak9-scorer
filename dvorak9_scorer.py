@@ -3,13 +3,13 @@
 Dvorak-9 scoring model implementation for keyboard layout evaluation.
 
 This script implements the 9 evaluation criteria derived from Dvorak's "Typing Behavior" 
-book and patent for evaluating keyboard layouts based on bigram typing behavior.
+book and patent (1936) for evaluating keyboard layouts based on bigram typing behavior.
 
 The 9 scoring criteria for typing bigrams are:
 1. Hands - favor alternating hands over same hand
 2. Fingers - avoid same finger repetition  
 3. Skip fingers - favor non-adjacent fingers over adjacent (same hand)
-4. Don't cross home - avoid crossing between non-adjacent rows
+4. Don't cross home - avoid crossing over the home row (hurdling)
 5. Same row - favor typing within the same row
 6. Home row - favor using the home row
 7. Columns - favor fingers staying in their designated columns
@@ -342,6 +342,220 @@ def print_results(results: Dict, show_details: bool = False):
                 print(f"  Bad examples (≤0.2): {', '.join(b['bad'][:10])}")
                 if len(b['bad']) > 10:
                     print(f"    ... and {len(b['bad'])-10} more")
+
+
+
+
+
+# Enhanced Dvorak9 scorer with bigram-level combination weighting
+
+def get_combination_weights():
+    """Return weights for different feature combinations based on empirical analysis."""
+    return {
+        # 5-way combinations (strongest)
+        ('fingers', 'same_row', 'home_row', 'strum', 'strong_fingers'): -0.148,
+        
+        # 4-way combinations
+        ('fingers', 'same_row', 'home_row', 'strum'): -0.147,
+        ('fingers', 'same_row', 'home_row', 'strong_fingers'): -0.141,
+        ('fingers', 'same_row', 'strum', 'strong_fingers'): -0.138,
+        
+        # 3-way combinations (most robust)
+        ('fingers', 'same_row', 'strum'): -0.124,
+        ('fingers', 'same_row', 'home_row'): -0.119,
+        ('fingers', 'strum', 'strong_fingers'): -0.115,
+        
+        # 2-way combinations
+        ('fingers', 'same_row'): -0.106,
+        ('fingers', 'strum'): -0.102,
+        ('same_row', 'strum'): -0.098,
+        
+        # Individual features (base effects)
+        ('fingers',): -0.088,
+        ('strum',): -0.087,
+        ('same_row',): -0.088,
+        ('home_row',): -0.058,
+        ('strong_fingers',): -0.045,
+        ('skip_fingers',): -0.038,
+        ('columns',): -0.025,
+        ('dont_cross_home',): -0.018,
+        ('hands',): +0.090,  # Positive = bad for typing speed
+        
+        # Default for no features
+        (): 0.0
+    }
+
+def identify_bigram_combination(bigram_scores, threshold=0.8):
+    """
+    Identify which feature combination a bigram exhibits.
+    
+    Args:
+        bigram_scores: Dict of feature scores for a single bigram
+        threshold: Minimum score to consider a feature "active"
+    
+    Returns:
+        Tuple of active feature names, sorted for consistent lookup
+    """
+    active_features = []
+    
+    for feature, score in bigram_scores.items():
+        if score >= threshold:
+            active_features.append(feature)
+    
+    return tuple(sorted(active_features))
+
+def score_bigram_weighted(bigram_scores, combination_weights):
+    """
+    Score a single bigram using combination-specific weights.
+    
+    Args:
+        bigram_scores: Dict of 9 feature scores for the bigram
+        combination_weights: Dict mapping combinations to empirical weights
+    
+    Returns:
+        Weighted score for this bigram
+    """
+    # Identify which combination this bigram exhibits
+    combination = identify_bigram_combination(bigram_scores)
+    
+    # Try to find exact match first
+    if combination in combination_weights:
+        weight = combination_weights[combination]
+        # Calculate combination strength (how well does bigram exhibit this combination)
+        combination_strength = sum(bigram_scores[feature] for feature in combination) / len(combination) if combination else 0
+        return weight * combination_strength
+    
+    # Fall back to best partial match
+    best_weight = 0.0
+    best_score = 0.0
+    
+    for combo, weight in combination_weights.items():
+        if not combo:  # Skip empty combination
+            continue
+            
+        # Check if this bigram exhibits this combination (partial match allowed)
+        if all(feature in bigram_scores for feature in combo):
+            combo_strength = sum(bigram_scores[feature] for feature in combo) / len(combo)
+            
+            # Penalize partial matches
+            match_completeness = len(set(combo) & set(identify_bigram_combination(bigram_scores))) / len(combo)
+            adjusted_score = weight * combo_strength * match_completeness
+            
+            if abs(adjusted_score) > abs(best_score):
+                best_score = adjusted_score
+    
+    return best_score
+
+class EnhancedDvorak9Scorer(Dvorak9Scorer):
+    """Enhanced scorer using bigram-level combination weighting."""
+    
+    def __init__(self, layout_mapping, text):
+        super().__init__(layout_mapping, text)
+        self.combination_weights = get_combination_weights()
+    
+    def calculate_combination_scores(self):
+        """Calculate layout score using bigram-level combination weighting."""
+        if not self.bigrams:
+            return {
+                'total_weighted_score': 0.0,
+                'bigram_count': 0,
+                'combination_breakdown': {},
+                'individual_scores': self._empty_scores()['scores']
+            }
+        
+        total_weighted_score = 0.0
+        combination_counts = defaultdict(int)
+        combination_score_sums = defaultdict(float)
+        bigram_details = []
+        
+        # Score each bigram with combination weighting
+        for char1, char2 in self.bigrams:
+            bigram_scores = self.score_bigram(char1, char2)
+            weighted_score = score_bigram_weighted(bigram_scores, self.combination_weights)
+            combination = identify_bigram_combination(bigram_scores)
+            
+            total_weighted_score += weighted_score
+            combination_counts[combination] += 1
+            combination_score_sums[combination] += weighted_score
+            
+            bigram_details.append({
+                'bigram': f"{char1}{char2}",
+                'scores': bigram_scores,
+                'combination': combination,
+                'weighted_score': weighted_score
+            })
+        
+        # Calculate combination breakdown
+        combination_breakdown = {}
+        for combo, count in combination_counts.items():
+            combination_breakdown[combo] = {
+                'count': count,
+                'total_contribution': combination_score_sums[combo],
+                'average_score': combination_score_sums[combo] / count if count > 0 else 0,
+                'percentage': count / len(self.bigrams) * 100
+            }
+        
+        # Also calculate traditional individual scores for comparison
+        individual_results = super().calculate_all_scores()
+        
+        return {
+            'total_weighted_score': total_weighted_score,
+            'average_weighted_score': total_weighted_score / len(self.bigrams),
+            'bigram_count': len(self.bigrams),
+            'combination_breakdown': combination_breakdown,
+            'individual_scores': individual_results['scores'],
+            'bigram_details': bigram_details
+        }
+
+def print_combination_results(results):
+    """Print formatted results from combination scoring."""
+    print("Enhanced Dvorak-9 Combination Scoring Results")
+    print("=" * 70)
+    
+    print(f"Total Weighted Score: {results['total_weighted_score']:8.3f}")
+    print(f"Average per Bigram:   {results['average_weighted_score']:8.3f}")
+    print(f"Bigrams Analyzed:     {results['bigram_count']:8d}")
+    
+    print("\nCombination Breakdown:")
+    print("-" * 70)
+    print(f"{'Combination':<35} {'Count':<8} {'Contrib':<10} {'Avg':<8} {'%':<6}")
+    print("-" * 70)
+    
+    # Sort by total contribution
+    sorted_combos = sorted(results['combination_breakdown'].items(), 
+                          key=lambda x: abs(x[1]['total_contribution']), 
+                          reverse=True)
+    
+    for combo, stats in sorted_combos[:15]:  # Top 15 combinations
+        combo_str = '+'.join(combo) if combo else 'none'
+        if len(combo_str) > 34:
+            combo_str = combo_str[:31] + '...'
+        
+        print(f"{combo_str:<35} {stats['count']:<8} {stats['total_contribution']:<10.3f} "
+              f"{stats['average_score']:<8.3f} {stats['percentage']:<6.1f}")
+
+# Example usage
+if __name__ == "__main__":
+    # Test with a simple layout
+    layout_mapping = {'a': 'F', 'b': 'D', 'c': 'J'}
+    text = "abacaba"
+    
+    # Traditional scoring
+    traditional_scorer = Dvorak9Scorer(layout_mapping, text)
+    traditional_results = traditional_scorer.calculate_all_scores()
+    
+    print("Traditional Scoring:")
+    print(f"Total: {traditional_results['total']:.3f}")
+    print()
+    
+    # Enhanced combination scoring
+    enhanced_scorer = EnhancedDvorak9Scorer(layout_mapping, text)
+    combination_results = enhanced_scorer.calculate_combination_scores()
+    
+    print_combination_results(combination_results)
+
+
+
 
 def main():
     """Main entry point."""
