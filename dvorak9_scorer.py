@@ -1,9 +1,9 @@
 # dvorak9_scorer.py
 """
-Dvorak-9 scoring model implementation for keyboard layout evaluation.
+Dvorak-9 empirical scoring model for keyboard layout evaluation.
 
 This script implements the 9 evaluation criteria derived from Dvorak's "Typing Behavior" 
-book and patent (1936) for evaluating keyboard layouts based on bigram typing behavior.
+book and patent (1936) with empirical weights based on analysis of real typing performance data.
 
 The 9 scoring criteria for typing bigrams are:
 1. Hands - favor alternating hands over same hand
@@ -16,9 +16,20 @@ The 9 scoring criteria for typing bigrams are:
 8. Strum - favor inward rolls over outward rolls (same hand)
 9. Strong fingers - favor stronger fingers over weaker ones
 
-Example usage:
-    python dvorak9_scorer.py --items "abc" --positions "FDJ" --text "abacaba"
-    python dvorak9_scorer.py --items "etaoinsrhldcumfp" --positions "FDESRJKUMIVLA;OW" --details
+Requires 'dvorak_combinations_fdr_results.csv' containing empirical weights derived 
+from 136M+ keystroke dataset analysis with FDR correction.
+
+# Basic scoring
+poetry run python3 dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./"  --weights-csv "output/speed_analysis/dvorak_combinations_fdr_results.csv"
+
+python dvorak9_scorer.py --items "etaoinsrhldcumfp" --positions "FDESRJKUMIVLA;OW"
+
+# With detailed breakdown
+python dvorak9_scorer.py --items "abc" --positions "FDJ" --details
+
+# CSV export for analysis
+python dvorak9_scorer.py --items "abc" --positions "FDJ" --csv > results.csv
+
 """
 
 import argparse
@@ -94,20 +105,154 @@ def is_finger_in_column(key: str, finger: int, hand: str) -> bool:
         return key in FINGER_COLUMNS[hand][finger]
     return False
 
-class Dvorak9Scorer:
-    """Implements the Dvorak-9 scoring model for keyboard layout evaluation."""
+def load_combination_weights(csv_path: str = "dvorak_combinations_fdr_results.csv"):
+    """
+    Load empirical correlation weights for different feature combinations from CSV file.
     
-    def __init__(self, layout_mapping: Dict[str, str], text: str):
+    Args:
+        csv_path: Path to CSV file containing combination correlations
+        
+    Returns:
+        Dict mapping combination tuples to correlation values
+        
+    The CSV should have 'combination' and 'correlation' columns.
+    These correlations are derived from analysis of 136M+ keystroke dataset
+    with FDR correction applied to 529 statistical tests.
+    """
+    import csv
+    import os
+    
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"Combination weights file not found: {csv_path}")
+    
+    combination_weights = {}
+    
+    try:
+        with open(csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            
+            for row in reader:
+                # Parse combination name
+                combination_str = row.get('combination', '').strip()
+                
+                # Get correlation value
+                correlation_str = row.get('correlation', '').strip()
+                if not correlation_str:
+                    continue  # Skip rows without correlation values
+                
+                try:
+                    correlation = float(correlation_str)
+                except ValueError:
+                    continue  # Skip rows with invalid correlation values
+                
+                # Convert combination string to tuple
+                if combination_str.lower() in ['none', 'empty', '']:
+                    combination = ()
+                else:
+                    # For individual features, just use the feature name
+                    if '+' in combination_str:
+                        # Multi-feature combination like "fingers+same_row+strum"
+                        features = [f.strip() for f in combination_str.split('+')]
+                        combination = tuple(sorted(features))
+                    else:
+                        # Single feature like "fingers"
+                        combination = (combination_str,)
+                
+                combination_weights[combination] = correlation
+                
+    except Exception as e:
+        raise ValueError(f"Error parsing combination weights CSV: {e}")
+    
+    # Ensure we have at least an empty combination
+    if () not in combination_weights:
+        combination_weights[()] = 0.0
+    
+    print(f"Loaded {len(combination_weights)} combination weights from {csv_path}")
+    
+    return combination_weights
+
+def identify_bigram_combination(bigram_scores, threshold=0.8):
+    """
+    Identify which feature combination a bigram exhibits.
+    
+    Args:
+        bigram_scores: Dict of feature scores for a single bigram
+        threshold: Minimum score to consider a feature "active"
+    
+    Returns:
+        Tuple of active feature names, sorted for consistent lookup
+    """
+    active_features = []
+    
+    for feature, score in bigram_scores.items():
+        if score >= threshold:
+            active_features.append(feature)
+    
+    return tuple(sorted(active_features))
+
+def score_bigram_weighted(bigram_scores, combination_weights):
+    """
+    Score a single bigram using empirical combination-specific weights.
+    
+    Args:
+        bigram_scores: Dict of 9 feature scores for the bigram
+        combination_weights: Dict mapping combinations to empirical weights
+    
+    Returns:
+        Weighted score for this bigram (negative = good for typing speed)
+    """
+    # Identify which combination this bigram exhibits
+    combination = identify_bigram_combination(bigram_scores)
+    
+    # Try to find exact match first
+    if combination in combination_weights:
+        weight = combination_weights[combination]
+        # Calculate combination strength (how well does bigram exhibit this combination)
+        combination_strength = sum(bigram_scores[feature] for feature in combination) / len(combination) if combination else 0
+        return weight * combination_strength
+    
+    # Fall back to best partial match
+    best_weight = 0.0
+    best_score = 0.0
+    
+    for combo, weight in combination_weights.items():
+        if not combo:  # Skip empty combination
+            continue
+            
+        # Check if this bigram exhibits this combination (partial match allowed)
+        if all(feature in bigram_scores for feature in combo):
+            combo_strength = sum(bigram_scores[feature] for feature in combo) / len(combo)
+            
+            # Penalize partial matches
+            match_completeness = len(set(combo) & set(identify_bigram_combination(bigram_scores))) / len(combo)
+            adjusted_score = weight * combo_strength * match_completeness
+            
+            if abs(adjusted_score) > abs(best_score):
+                best_score = adjusted_score
+    
+    return best_score
+
+class Dvorak9Scorer:
+    """
+    Dvorak-9 scorer using empirical combination weighting.
+    
+    Implements the 9 evaluation criteria derived from Dvorak's work with
+    empirical weights derived from analysis of real typing performance data.
+    """
+    
+    def __init__(self, layout_mapping: Dict[str, str], text: str, weights_csv: str = "dvorak_combinations_fdr_results.csv"):
         """
         Initialize scorer with layout mapping and text.
         
         Args:
             layout_mapping: Dict mapping characters to QWERTY positions (e.g., {'a': 'F', 'b': 'D'})
             text: Text to analyze for bigram scoring
+            weights_csv: Path to CSV file containing empirical combination weights
         """
         self.layout_mapping = layout_mapping
         self.text = text.lower()
         self.bigrams = self._extract_bigrams()
+        self.combination_weights = load_combination_weights(weights_csv)
 
     def _extract_bigrams(self) -> List[Tuple[str, str]]:
         """Extract all consecutive character pairs from text that exist in layout mapping."""
@@ -212,53 +357,75 @@ class Dvorak9Scorer:
         
         return scores
 
-    def calculate_all_scores(self) -> Dict:
-        """Calculate mean scores across all bigrams for each criterion."""
+    def calculate_scores(self):
+        """Calculate layout score using empirical combination weighting."""
         if not self.bigrams:
-            return self._empty_scores()
+            return {
+                'total_weighted_score': 0.0,
+                'average_weighted_score': 0.0,
+                'bigram_count': 0,
+                'individual_scores': {},
+                'combination_breakdown': {},
+                'bigram_details': []
+            }
         
-        # Initialize accumulators
-        criterion_sums = defaultdict(float)
-        criterion_counts = defaultdict(int)
+        total_weighted_score = 0.0
+        combination_counts = defaultdict(int)
+        combination_score_sums = defaultdict(float)
         bigram_details = []
         
-        # Score each bigram
+        # Initialize accumulators for individual unweighted scores
+        criterion_sums = defaultdict(float)
+        criterion_counts = defaultdict(int)
+        
+        # Score each bigram with combination weighting
         for char1, char2 in self.bigrams:
             bigram_scores = self.score_bigram(char1, char2)
-            bigram_details.append((char1, char2, bigram_scores))
+            weighted_score = score_bigram_weighted(bigram_scores, self.combination_weights)
+            combination = identify_bigram_combination(bigram_scores)
             
+            total_weighted_score += weighted_score
+            combination_counts[combination] += 1
+            combination_score_sums[combination] += weighted_score
+            
+            # Accumulate individual criterion scores (unweighted)
             for criterion, score in bigram_scores.items():
                 criterion_sums[criterion] += score
                 criterion_counts[criterion] += 1
+            
+            bigram_details.append({
+                'bigram': f"{char1}{char2}",
+                'scores': bigram_scores,
+                'combination': combination,
+                'weighted_score': weighted_score
+            })
         
-        # Calculate mean scores
-        mean_scores = {}
+        # Calculate mean individual scores (unweighted, 0-1 scale)
+        individual_scores = {}
         for criterion in ['hands', 'fingers', 'skip_fingers', 'dont_cross_home', 
                          'same_row', 'home_row', 'columns', 'strum', 'strong_fingers']:
             if criterion_counts[criterion] > 0:
-                mean_scores[criterion] = criterion_sums[criterion] / criterion_counts[criterion]
+                individual_scores[criterion] = criterion_sums[criterion] / criterion_counts[criterion]
             else:
-                mean_scores[criterion] = 0.0
+                individual_scores[criterion] = 0.0
         
-        # Calculate total score (sum of all 9 criteria)
-        total_score = sum(mean_scores.values())
+        # Calculate combination breakdown
+        combination_breakdown = {}
+        for combo, count in combination_counts.items():
+            combination_breakdown[combo] = {
+                'count': count,
+                'total_contribution': combination_score_sums[combo],
+                'average_score': combination_score_sums[combo] / count if count > 0 else 0,
+                'percentage': count / len(self.bigrams) * 100
+            }
         
         return {
-            'scores': mean_scores,
-            'total': total_score,
+            'total_weighted_score': total_weighted_score,
+            'average_weighted_score': total_weighted_score / len(self.bigrams),
             'bigram_count': len(self.bigrams),
+            'individual_scores': individual_scores,
+            'combination_breakdown': combination_breakdown,
             'bigram_details': bigram_details
-        }
-
-    def _empty_scores(self) -> Dict:
-        """Return empty score structure when no bigrams available."""
-        criteria = ['hands', 'fingers', 'skip_fingers', 'dont_cross_home', 
-                   'same_row', 'home_row', 'columns', 'strum', 'strong_fingers']
-        return {
-            'scores': {criterion: 0.0 for criterion in criteria},
-            'total': 0.0,
-            'bigram_count': 0,
-            'bigram_details': []
         }
 
     def get_detailed_breakdown(self) -> Dict:
@@ -284,244 +451,43 @@ class Dvorak9Scorer:
         
         return dict(breakdown)
 
-def print_results(results: Dict, show_details: bool = False):
-    """Print formatted results."""
-    scores = results['scores']
-    
-    print("Dvorak-9 Scoring Results")
-    print("=" * 60)
-    
-    criteria_info = [
-        ('hands', '1. Hands (favor alternating hands)'),
-        ('fingers', '2. Fingers (avoid same finger)'),
-        ('skip_fingers', '3. Skip fingers (favor non-adjacent)'),
-        ('dont_cross_home', '4. Don\'t cross home (avoid hurdling)'),
-        ('same_row', '5. Same row (stay in same row)'),
-        ('home_row', '6. Home row (favor home row use)'),
-        ('columns', '7. Columns (stay in finger columns)'),
-        ('strum', '8. Strum (favor inward rolls)'),
-        ('strong_fingers', '9. Strong fingers (favor index/middle)')
-    ]
-    
-    for key, name in criteria_info:
-        score = scores[key]
-        print(f"{name:<45} | {score:6.3f}")
-    
-    print("-" * 60)
-    print(f"{'Total Score (sum of all 9)':<45} | {results['total']:6.3f}")
-    print(f"{'Average Score':<45} | {results['total']/9:6.3f}")
-    print(f"{'Bigrams analyzed':<45} | {results['bigram_count']:6d}")
-    
-    if show_details:
-        print("\nDetailed Breakdown:")
-        print("=" * 60)
-        
-        breakdown = {}
-        if results['bigram_details']:
-            # Rebuild breakdown from bigram details
-            for char1, char2, bigram_scores in results['bigram_details']:
-                for criterion, score in bigram_scores.items():
-                    if criterion not in breakdown:
-                        breakdown[criterion] = {'good': [], 'bad': [], 'neutral': []}
-                    
-                    example = f"{char1}{char2}"
-                    if score >= 0.8:
-                        breakdown[criterion]['good'].append(example)
-                    elif score <= 0.2:
-                        breakdown[criterion]['bad'].append(example)
-                    else:
-                        breakdown[criterion]['neutral'].append(example)
-        
-        for key, name in criteria_info:
-            print(f"\n{name}:")
-            if key in breakdown:
-                b = breakdown[key]
-                print(f"  Good examples (≥0.8): {', '.join(b['good'][:10])}")
-                if len(b['good']) > 10:
-                    print(f"    ... and {len(b['good'])-10} more")
-                print(f"  Bad examples (≤0.2): {', '.join(b['bad'][:10])}")
-                if len(b['bad']) > 10:
-                    print(f"    ... and {len(b['bad'])-10} more")
-
-
-
-
-
-# Enhanced Dvorak9 scorer with bigram-level combination weighting
-
-def get_combination_weights():
-    """Return weights for different feature combinations based on empirical analysis."""
-    return {
-        # 5-way combinations (strongest)
-        ('fingers', 'same_row', 'home_row', 'strum', 'strong_fingers'): -0.148,
-        
-        # 4-way combinations
-        ('fingers', 'same_row', 'home_row', 'strum'): -0.147,
-        ('fingers', 'same_row', 'home_row', 'strong_fingers'): -0.141,
-        ('fingers', 'same_row', 'strum', 'strong_fingers'): -0.138,
-        
-        # 3-way combinations (most robust)
-        ('fingers', 'same_row', 'strum'): -0.124,
-        ('fingers', 'same_row', 'home_row'): -0.119,
-        ('fingers', 'strum', 'strong_fingers'): -0.115,
-        
-        # 2-way combinations
-        ('fingers', 'same_row'): -0.106,
-        ('fingers', 'strum'): -0.102,
-        ('same_row', 'strum'): -0.098,
-        
-        # Individual features (base effects)
-        ('fingers',): -0.088,
-        ('strum',): -0.087,
-        ('same_row',): -0.088,
-        ('home_row',): -0.058,
-        ('strong_fingers',): -0.045,
-        ('skip_fingers',): -0.038,
-        ('columns',): -0.025,
-        ('dont_cross_home',): -0.018,
-        ('hands',): +0.090,  # Positive = bad for typing speed
-        
-        # Default for no features
-        (): 0.0
-    }
-
-def identify_bigram_combination(bigram_scores, threshold=0.8):
-    """
-    Identify which feature combination a bigram exhibits.
-    
-    Args:
-        bigram_scores: Dict of feature scores for a single bigram
-        threshold: Minimum score to consider a feature "active"
-    
-    Returns:
-        Tuple of active feature names, sorted for consistent lookup
-    """
-    active_features = []
-    
-    for feature, score in bigram_scores.items():
-        if score >= threshold:
-            active_features.append(feature)
-    
-    return tuple(sorted(active_features))
-
-def score_bigram_weighted(bigram_scores, combination_weights):
-    """
-    Score a single bigram using combination-specific weights.
-    
-    Args:
-        bigram_scores: Dict of 9 feature scores for the bigram
-        combination_weights: Dict mapping combinations to empirical weights
-    
-    Returns:
-        Weighted score for this bigram
-    """
-    # Identify which combination this bigram exhibits
-    combination = identify_bigram_combination(bigram_scores)
-    
-    # Try to find exact match first
-    if combination in combination_weights:
-        weight = combination_weights[combination]
-        # Calculate combination strength (how well does bigram exhibit this combination)
-        combination_strength = sum(bigram_scores[feature] for feature in combination) / len(combination) if combination else 0
-        return weight * combination_strength
-    
-    # Fall back to best partial match
-    best_weight = 0.0
-    best_score = 0.0
-    
-    for combo, weight in combination_weights.items():
-        if not combo:  # Skip empty combination
-            continue
-            
-        # Check if this bigram exhibits this combination (partial match allowed)
-        if all(feature in bigram_scores for feature in combo):
-            combo_strength = sum(bigram_scores[feature] for feature in combo) / len(combo)
-            
-            # Penalize partial matches
-            match_completeness = len(set(combo) & set(identify_bigram_combination(bigram_scores))) / len(combo)
-            adjusted_score = weight * combo_strength * match_completeness
-            
-            if abs(adjusted_score) > abs(best_score):
-                best_score = adjusted_score
-    
-    return best_score
-
-class EnhancedDvorak9Scorer(Dvorak9Scorer):
-    """Enhanced scorer using bigram-level combination weighting."""
-    
-    def __init__(self, layout_mapping, text):
-        super().__init__(layout_mapping, text)
-        self.combination_weights = get_combination_weights()
-    
-    def calculate_combination_scores(self):
-        """Calculate layout score using bigram-level combination weighting."""
-        if not self.bigrams:
-            return {
-                'total_weighted_score': 0.0,
-                'bigram_count': 0,
-                'combination_breakdown': {},
-                'individual_scores': self._empty_scores()['scores']
-            }
-        
-        total_weighted_score = 0.0
-        combination_counts = defaultdict(int)
-        combination_score_sums = defaultdict(float)
-        bigram_details = []
-        
-        # Score each bigram with combination weighting
-        for char1, char2 in self.bigrams:
-            bigram_scores = self.score_bigram(char1, char2)
-            weighted_score = score_bigram_weighted(bigram_scores, self.combination_weights)
-            combination = identify_bigram_combination(bigram_scores)
-            
-            total_weighted_score += weighted_score
-            combination_counts[combination] += 1
-            combination_score_sums[combination] += weighted_score
-            
-            bigram_details.append({
-                'bigram': f"{char1}{char2}",
-                'scores': bigram_scores,
-                'combination': combination,
-                'weighted_score': weighted_score
-            })
-        
-        # Calculate combination breakdown
-        combination_breakdown = {}
-        for combo, count in combination_counts.items():
-            combination_breakdown[combo] = {
-                'count': count,
-                'total_contribution': combination_score_sums[combo],
-                'average_score': combination_score_sums[combo] / count if count > 0 else 0,
-                'percentage': count / len(self.bigrams) * 100
-            }
-        
-        # Also calculate traditional individual scores for comparison
-        individual_results = super().calculate_all_scores()
-        
-        return {
-            'total_weighted_score': total_weighted_score,
-            'average_weighted_score': total_weighted_score / len(self.bigrams),
-            'bigram_count': len(self.bigrams),
-            'combination_breakdown': combination_breakdown,
-            'individual_scores': individual_results['scores'],
-            'bigram_details': bigram_details
-        }
-
 def print_combination_results(results):
-    """Print formatted results from combination scoring."""
-    print("Enhanced Dvorak-9 Combination Scoring Results")
+    """Print formatted results from empirical combination scoring."""
+    print("Dvorak-9 Empirical Combination Scoring Results")
     print("=" * 70)
     
-    print(f"Total Weighted Score: {results['total_weighted_score']:8.3f}")
-    print(f"Average per Bigram:   {results['average_weighted_score']:8.3f}")
-    print(f"Bigrams Analyzed:     {results['bigram_count']:8d}")
+    # Primary metric - empirically validated
+    print(f"Empirical Score: {results['total_weighted_score']:8.3f}  (lower = better typing speed)")
+    print(f"Bigrams Analyzed: {results['bigram_count']:8d}")
     
-    print("\nCombination Breakdown:")
+    # Secondary metrics - individual criteria for interpretability 
+    print(f"\nIndividual Criterion Breakdown (0-1 scale, higher = better):")
+    print("-" * 60)
+    
+    criteria_info = [
+        ('hands', '1. Hands (alternating)'),
+        ('fingers', '2. Fingers (avoid same)'),
+        ('skip_fingers', '3. Skip fingers'),
+        ('dont_cross_home', '4. Don\'t cross home'),
+        ('same_row', '5. Same row'),
+        ('home_row', '6. Home row'),
+        ('columns', '7. Columns'),
+        ('strum', '8. Strum (inward rolls)'),
+        ('strong_fingers', '9. Strong fingers')
+    ]
+    
+    individual_scores = results.get('individual_scores', {})
+    for key, name in criteria_info:
+        score = individual_scores.get(key, 0.0)
+        print(f"  {name:<25}: {score:6.3f}")
+    
+    # Detailed breakdown - combination contributions
+    print(f"\nCombination Breakdown:")
     print("-" * 70)
     print(f"{'Combination':<35} {'Count':<8} {'Contrib':<10} {'Avg':<8} {'%':<6}")
     print("-" * 70)
     
-    # Sort by total contribution
+    # Sort by total contribution magnitude
     sorted_combos = sorted(results['combination_breakdown'].items(), 
                           key=lambda x: abs(x[1]['total_contribution']), 
                           reverse=True)
@@ -534,36 +500,14 @@ def print_combination_results(results):
         print(f"{combo_str:<35} {stats['count']:<8} {stats['total_contribution']:<10.3f} "
               f"{stats['average_score']:<8.3f} {stats['percentage']:<6.1f}")
 
-# Example usage
-if __name__ == "__main__":
-    # Test with a simple layout
-    layout_mapping = {'a': 'F', 'b': 'D', 'c': 'J'}
-    text = "abacaba"
-    
-    # Traditional scoring
-    traditional_scorer = Dvorak9Scorer(layout_mapping, text)
-    traditional_results = traditional_scorer.calculate_all_scores()
-    
-    print("Traditional Scoring:")
-    print(f"Total: {traditional_results['total']:.3f}")
-    print()
-    
-    # Enhanced combination scoring
-    enhanced_scorer = EnhancedDvorak9Scorer(layout_mapping, text)
-    combination_results = enhanced_scorer.calculate_combination_scores()
-    
-    print_combination_results(combination_results)
-
-
-
-
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Calculate Dvorak-9 layout scores for keyboard evaluation.",
+        description="Calculate Dvorak-9 layout scores using empirical combination weighting.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+
   # Basic scoring
   python dvorak9_scorer.py --items "abc" --positions "FDJ" --text "abacaba"
   
@@ -572,7 +516,13 @@ Examples:
   
   # Use items as text if no text provided
   python dvorak9_scorer.py --items "abc" --positions "FDJ"
-        """
+  
+  # Use custom weights file
+  python dvorak9_scorer.py --items "abc" --positions "FDJ" --weights-csv "output/speed_analysis/dvorak_combinations_fdr_results.csv"
+
+  # QWERTY to QWERTY
+  poetry run python3 dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./"
+"""
     )
     
     parser.add_argument("--items", required=True,
@@ -581,6 +531,8 @@ Examples:
                        help="String of QWERTY positions (e.g., 'FDESRJKUMIVLA;OW')")
     parser.add_argument("--text",
                        help="Text to analyze (default: uses items string)")
+    parser.add_argument("--weights-csv", default="output/speed_analysis/dvorak_combinations_fdr_results.csv",
+                       help="Path to CSV file containing empirical combination weights")
     parser.add_argument("--details", action="store_true",
                        help="Show detailed breakdown with examples")
     parser.add_argument("--csv", action="store_true",
@@ -600,23 +552,68 @@ Examples:
         # Use provided text or items string
         text = args.text if args.text else args.items
         
-        # Initialize scorer and calculate
-        scorer = Dvorak9Scorer(layout_mapping, text)
-        results = scorer.calculate_all_scores()
+        # Calculate scores
+        scorer = Dvorak9Scorer(layout_mapping, text, args.weights_csv)
+        results = scorer.calculate_scores()
         
         if args.csv:
             # CSV output
-            print("criterion,score")
-            for criterion, score in results['scores'].items():
-                print(f"{criterion},{score:.6f}")
-            print(f"total,{results['total']:.6f}")
+            print("metric,value")
+            print(f"empirical_score,{results['total_weighted_score']:.6f}")
+            print(f"average_empirical_score,{results['average_weighted_score']:.6f}")
+            print(f"bigram_count,{results['bigram_count']}")
+            
+            # Individual unweighted scores
+            individual_scores = results.get('individual_scores', {})
+            for criterion in ['hands', 'fingers', 'skip_fingers', 'dont_cross_home', 
+                             'same_row', 'home_row', 'columns', 'strum', 'strong_fingers']:
+                score = individual_scores.get(criterion, 0.0)
+                print(f"individual_{criterion},{score:.6f}")
+            
+            # Top combinations
+            sorted_combos = sorted(results['combination_breakdown'].items(), 
+                                  key=lambda x: abs(x[1]['total_contribution']), 
+                                  reverse=True)
+            for i, (combo, stats) in enumerate(sorted_combos[:5]):
+                combo_str = '+'.join(combo) if combo else 'none'
+                print(f"top_combo_{i+1},{combo_str}")
+                print(f"top_combo_{i+1}_contribution,{stats['total_contribution']:.6f}")
+                
         else:
             # Human-readable output
             print(f"Layout: {args.items} → {args.positions}")
             print(f"Text: '{text[:50]}{'...' if len(text) > 50 else ''}'")
             print()
             
-            print_results(results, args.details)
+            print_combination_results(results)
+            
+            if args.details:
+                breakdown = scorer.get_detailed_breakdown()
+                print("\nDetailed Breakdown by Criterion:")
+                print("=" * 60)
+                
+                criteria_info = [
+                    ('hands', '1. Hands (favor alternating hands)'),
+                    ('fingers', '2. Fingers (avoid same finger)'),
+                    ('skip_fingers', '3. Skip fingers (favor non-adjacent)'),
+                    ('dont_cross_home', '4. Don\'t cross home (avoid hurdling)'),
+                    ('same_row', '5. Same row (stay in same row)'),
+                    ('home_row', '6. Home row (favor home row use)'),
+                    ('columns', '7. Columns (stay in finger columns)'),
+                    ('strum', '8. Strum (favor inward rolls)'),
+                    ('strong_fingers', '9. Strong fingers (favor index/middle)')
+                ]
+                
+                for key, name in criteria_info:
+                    if key in breakdown:
+                        b = breakdown[key]
+                        print(f"\n{name}:")
+                        print(f"  Good examples (≥0.8): {', '.join(b['good'][:10])}")
+                        if len(b['good']) > 10:
+                            print(f"    ... and {len(b['good'])-10} more")
+                        print(f"  Bad examples (≤0.2): {', '.join(b['bad'][:10])}")
+                        if len(b['bad']) > 10:
+                            print(f"    ... and {len(b['bad'])-10} more")
         
     except Exception as e:
         print(f"Error: {e}")
@@ -624,4 +621,28 @@ Examples:
         traceback.print_exc()
 
 if __name__ == "__main__":
-    main()
+    # Check if being run directly vs imported
+    import sys
+    if len(sys.argv) > 1:
+        # Command line usage
+        main()
+    else:
+        # Example usage when imported/run without args
+        print("Dvorak-9 Empirical Combination Scoring Example")
+        print("="*50)
+        
+        layout_mapping = {'a': 'F', 'b': 'D', 'c': 'J'}
+        text = "abacaba"
+        
+        try:
+            scorer = Dvorak9Scorer(layout_mapping, text)
+            results = scorer.calculate_scores()
+            print_combination_results(results)
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            print("Please ensure 'dvorak_combinations_fdr_results.csv' is in the current directory.")
+            print("This file should contain the empirical combination weights.")
+        except Exception as e:
+            print(f"Error: {e}")
+            import traceback
+            traceback.print_exc()

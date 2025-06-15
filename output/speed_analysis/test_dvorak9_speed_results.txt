@@ -955,7 +955,7 @@ DIFFERENCES BETWEEN GROUPS:
 ANALYSIS COMPLETE
 ================================================================================
 Total runtime: 25.3m
-Enhanced Dvorak-9 Analysis Complete
+Dvorak-9 Analysis Complete
 Now using unified scorer with empirical combination weighting
 Dvorak-9 Criteria Correlation Analysis - Bigram Speed
 ================================================================================
@@ -1914,5 +1914,5 @@ DIFFERENCES BETWEEN GROUPS:
 ANALYSIS COMPLETE
 ================================================================================
 Total runtime: 25.3m
-Enhanced Dvorak-9 Analysis Complete
+Dvorak-9 Analysis Complete
 Now using unified scorer with empirical combination weighting
