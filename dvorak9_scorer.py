@@ -30,6 +30,13 @@ python dvorak9_scorer.py --items "abc" --positions "FDJ" --details
 # CSV export for analysis
 python dvorak9_scorer.py --items "abc" --positions "FDJ" --csv > results.csv
 
+# Use items as text if no text provided
+python dvorak9_scorer.py --items "abc" --positions "FDJ" --text "abacaba"
+python dvorak9_scorer.py --items "abc" --positions "FDJ" --text-file "sample_text.txt"
+
+# Return just the 10 scores (total weighted + 9 individual scores)
+python dvorak9_scorer.py --items "abc" --positions "FDJ" --ten-scores
+
 """
 
 import argparse
@@ -522,6 +529,14 @@ Examples:
 
   # QWERTY to QWERTY
   poetry run python3 dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./"
+
+  # Use items as text if no text provided
+  python dvorak9_scorer.py --items "abc" --positions "FDJ" --text "abacaba"
+  python dvorak9_scorer.py --items "abc" --positions "FDJ" --text-file "sample_text.txt"
+
+  # Return just the 10 scores (total weighted + 9 individual scores)
+  python dvorak9_scorer.py --items "abc" --positions "FDJ" --ten-scores
+  
 """
     )
     
@@ -531,13 +546,17 @@ Examples:
                        help="String of QWERTY positions (e.g., 'FDESRJKUMIVLA;OW')")
     parser.add_argument("--text",
                        help="Text to analyze (default: uses items string)")
+    parser.add_argument("--text-file",
+                       help="Path to text file to analyze (alternative to --text)")
     parser.add_argument("--weights-csv", default="dvorak9_weights.csv",
                        help="Path to CSV file containing empirical combination weights")
     parser.add_argument("--details", action="store_true",
                        help="Show detailed breakdown with examples")
     parser.add_argument("--csv", action="store_true",
                        help="Output in CSV format")
-    
+    parser.add_argument("--ten-scores", action="store_true",
+                       help="Output only 10 scores: total weighted score followed by 9 individual scores")
+
     args = parser.parse_args()
     
     try:
@@ -549,14 +568,37 @@ Examples:
         # Create layout mapping
         layout_mapping = dict(zip(args.items.lower(), args.positions.upper()))
         
-        # Use provided text or items string
-        text = args.text if args.text else args.items
-        
+        # Determine text source (priority: text-file > text > items)
+        if args.text_file:
+            try:
+                with open(args.text_file, 'r', encoding='utf-8') as f:
+                    text = f.read()
+            except Exception as e:
+                print(f"Error reading text file: {e}")
+                return
+        elif args.text:
+            text = args.text
+        else:
+            text = args.items
+
         # Calculate scores
         scorer = Dvorak9Scorer(layout_mapping, text, args.weights_csv)
         results = scorer.calculate_scores()
-        
-        if args.csv:
+
+        if args.ten_scores:
+            # Output 10 scores: total weighted score + 9 individual scores
+            individual_scores = results.get('individual_scores', {})
+            scores = [results['total_weighted_score']]
+            
+            # Add individual scores in consistent order
+            for criterion in ['hands', 'fingers', 'skip_fingers', 'dont_cross_home', 
+                            'same_row', 'home_row', 'columns', 'strum', 'strong_fingers']:
+                scores.append(individual_scores.get(criterion, 0.0))
+            
+            print(' '.join(f"{score:.6f}" for score in scores))
+            
+        elif args.csv:
+
             # CSV output
             print("metric,value")
             print(f"empirical_score,{results['total_weighted_score']:.6f}")
