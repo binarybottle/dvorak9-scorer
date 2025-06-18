@@ -5,7 +5,7 @@ Dvorak-9 empirical scoring model for keyboard layout evaluation.
 This script implements the 9 evaluation criteria derived from Dvorak's "Typing Behavior" 
 book and patent (1936) with empirical weights based on analysis of real typing performance data.
 
-The 9 scoring criteria for typing bigrams are:
+The 9 scoring criteria for typing bigrams are (0-1, higher = better performance):
 1. Hands - favor alternating hands over same hand
 2. Fingers - avoid same finger repetition  
 3. Skip fingers - favor non-adjacent fingers over adjacent (same hand)
@@ -15,6 +15,9 @@ The 9 scoring criteria for typing bigrams are:
 7. Columns - favor fingers staying in their designated columns
 8. Strum - favor inward rolls over outward rolls (same hand)
 9. Strong fingers - favor stronger fingers over weaker ones
+
+The combined layout score is calculated as the negative of the empirical weighted combination score,
+so that HIGHER scores indicate BETTER layouts (consistent with individual criteria).
 
 Requires 'dvorak9_weights.csv' containing empirical weights derived 
 from 136M+ keystroke dataset analysis with FDR correction.
@@ -34,7 +37,7 @@ python dvorak9_scorer.py --items "abc" --positions "FDJ" --csv > results.csv
 python dvorak9_scorer.py --items "abc" --positions "FDJ" --text "abacaba"
 python dvorak9_scorer.py --items "abc" --positions "FDJ" --text-file "sample_text.txt"
 
-# Return just the 10 scores (total weighted + 9 individual scores)
+# Return just the 10 scores (average weighted + 9 individual scores)
 python dvorak9_scorer.py --items "abc" --positions "FDJ" --ten-scores
 
 """
@@ -262,16 +265,24 @@ class Dvorak9Scorer:
         self.combination_weights = load_combination_weights(weights_csv)
 
     def _extract_bigrams(self) -> List[Tuple[str, str]]:
-        """Extract all consecutive character pairs from text that exist in layout mapping."""
+        """Extract all consecutive character pairs from text that exist in layout mapping.
+        
+        Spaces and other non-layout characters act as word boundaries that break bigram chains.
+        """
         bigrams = []
         
-        # Filter text to only characters in our layout
-        filtered_chars = [char for char in self.text if char in self.layout_mapping]
+        # Split text into words first (respecting boundaries)
+        import re
+        words = re.findall(r'\S+', self.text)  # Split on whitespace
         
-        # Create bigrams from consecutive characters
-        for i in range(len(filtered_chars) - 1):
-            char1, char2 = filtered_chars[i], filtered_chars[i + 1]
-            bigrams.append((char1, char2))
+        for word in words:
+            # Filter each word to only characters in our layout
+            filtered_chars = [char for char in word.lower() if char in self.layout_mapping]
+            
+            # Create bigrams from consecutive characters within each word
+            for i in range(len(filtered_chars) - 1):
+                char1, char2 = filtered_chars[i], filtered_chars[i + 1]
+                bigrams.append((char1, char2))
         
         return bigrams
 
@@ -368,8 +379,9 @@ class Dvorak9Scorer:
         """Calculate layout score using empirical combination weighting."""
         if not self.bigrams:
             return {
-                'total_weighted_score': 0.0,
+                'layout_score': 0.0,  # 0 is neutral for higher = better
                 'average_weighted_score': 0.0,
+                'total_weighted_score': 0.0,
                 'bigram_count': 0,
                 'individual_scores': {},
                 'combination_breakdown': {},
@@ -391,9 +403,9 @@ class Dvorak9Scorer:
             weighted_score = score_bigram_weighted(bigram_scores, self.combination_weights)
             combination = identify_bigram_combination(bigram_scores)
             
-            total_weighted_score += weighted_score
+            total_weighted_score += -weighted_score  # FLIP SIGN
             combination_counts[combination] += 1
-            combination_score_sums[combination] += weighted_score
+            combination_score_sums[combination] += -weighted_score  # FLIP SIGN
             
             # Accumulate individual criterion scores (unweighted)
             for criterion, score in bigram_scores.items():
@@ -404,7 +416,7 @@ class Dvorak9Scorer:
                 'bigram': f"{char1}{char2}",
                 'scores': bigram_scores,
                 'combination': combination,
-                'weighted_score': weighted_score
+                'weighted_score': -weighted_score  # FLIP SIGN
             })
         
         # Calculate mean individual scores (unweighted, 0-1 scale)
@@ -421,14 +433,18 @@ class Dvorak9Scorer:
         for combo, count in combination_counts.items():
             combination_breakdown[combo] = {
                 'count': count,
-                'total_contribution': combination_score_sums[combo],
-                'average_score': combination_score_sums[combo] / count if count > 0 else 0,
+                'total_contribution': combination_score_sums[combo],  # Already flipped above
+                'average_score': combination_score_sums[combo] / count if count > 0 else 0,  # Already flipped
                 'percentage': count / len(self.bigrams) * 100
             }
-        
+
+        # Calculate average weighted score (the main metric)
+        average_weighted_score = total_weighted_score / len(self.bigrams)
+
         return {
-            'total_weighted_score': total_weighted_score,
-            'average_weighted_score': total_weighted_score / len(self.bigrams),
+            'layout_score': average_weighted_score,  # Primary metric
+            'average_weighted_score': average_weighted_score,  # Keep existing name
+            'total_weighted_score': total_weighted_score,  # Keep for backwards compatibility
             'bigram_count': len(self.bigrams),
             'individual_scores': individual_scores,
             'combination_breakdown': combination_breakdown,
@@ -464,7 +480,7 @@ def print_combination_results(results):
     print("=" * 70)
     
     # Primary metric - empirically validated
-    print(f"Empirical Score: {results['total_weighted_score']:8.3f}  (lower = better typing speed)")
+    print(f"Empirical Score: {results['average_weighted_score']:8.3f}")
     print(f"Bigrams Analyzed: {results['bigram_count']:8d}")
     
     # Secondary metrics - individual criteria for interpretability 
@@ -586,9 +602,11 @@ Examples:
         results = scorer.calculate_scores()
 
         if args.ten_scores:
-            # Output 10 scores: total weighted score + 9 individual scores
+            # Output 10 scores: average weighted score + 9 individual scores
             individual_scores = results.get('individual_scores', {})
-            scores = [results['total_weighted_score']]
+            
+            # Use average_weighted_score
+            scores = [results['average_weighted_score']]
             
             # Add individual scores in consistent order
             for criterion in ['hands', 'fingers', 'skip_fingers', 'dont_cross_home', 
@@ -596,13 +614,15 @@ Examples:
                 scores.append(individual_scores.get(criterion, 0.0))
             
             print(' '.join(f"{score:.6f}" for score in scores))
-            
-        elif args.csv:
 
+        elif args.csv:
             # CSV output
             print("metric,value")
-            print(f"empirical_score,{results['total_weighted_score']:.6f}")
+            
+            # Use average as the main empirical score
+            print(f"empirical_score,{results['average_weighted_score']:.6f}")            
             print(f"average_empirical_score,{results['average_weighted_score']:.6f}")
+            print(f"total_empirical_score,{results['total_weighted_score']:.6f}")
             print(f"bigram_count,{results['bigram_count']}")
             
             # Individual unweighted scores
