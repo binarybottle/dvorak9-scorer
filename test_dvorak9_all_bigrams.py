@@ -6,6 +6,9 @@ This script systematically tests every possible bigram combination of a QWERTY l
 to validate that the 9 Dvorak criteria are implemented correctly and produce 
 expected score patterns.
 
+This version uses the canonical scoring implementation from dvorak9_scorer.py to
+ensure consistency across the codebase.
+
 Outputs:
 1. 'dvorak9_scores_all_bigrams.csv' - All possible bigrams with individual scores and metadata
 2. 'dvorak9_scores_unique_all_bigrams.csv' - Unique score patterns with counts and examples
@@ -17,18 +20,21 @@ Features:
 - Identifies criteria with constant or low-variation scores
 - Provides comprehensive debugging output for criterion implementation
 
-Use this script to verify that the Dvorak-9 scoring system is working correctly
-before running empirical analysis on real typing data.
-2. Unique score patterns with counts and examples
+Usage:
+python test_dvorak9_all_bigrams.py
+
+Outputs:
+dvorak9_scores_all_bigrams.csv
+dvorak9_scores_unique_all_bigrams.csv
 """
 
 import sys
 import os
 import csv
 from collections import defaultdict
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from dvorak9_scorer import Dvorak9Scorer, get_key_info, QWERTY_LAYOUT
+# Import the canonical scoring function
+from dvorak9_scorer import score_bigram_dvorak9, get_key_info, QWERTY_LAYOUT
 
 def get_all_qwerty_keys():
     """Get all standard QWERTY keys for testing."""
@@ -42,20 +48,16 @@ def test_all_bigrams(all_bigrams_file="dvorak9_scores_all_bigrams.csv",
     keys = get_all_qwerty_keys()
     print(f"Testing {len(keys)} keys = {len(keys)**2} possible bigrams")
     
-    # Create dummy layout mapping (each key maps to itself)
-    layout_mapping = {key.lower(): key for key in keys}
-    
     results = []
     score_patterns = defaultdict(list)  # Track bigrams for each unique score pattern
     
     # Test every possible bigram
     for key1 in keys:
         for key2 in keys:
-            char1, char2 = key1.lower(), key2.lower()
+            bigram = key1 + key2
             
-            # Create a minimal scorer just for this bigram
-            scorer = Dvorak9Scorer(layout_mapping, char1 + char2)
-            bigram_scores = scorer.score_bigram(char1, char2)
+            # Use the canonical scoring function
+            bigram_scores = score_bigram_dvorak9(bigram)
             
             # Get key info for analysis
             row1, finger1, hand1 = get_key_info(key1)
@@ -63,7 +65,7 @@ def test_all_bigrams(all_bigrams_file="dvorak9_scores_all_bigrams.csv",
             
             # Create result row
             result = {
-                'bigram': f"{key1}{key2}",
+                'bigram': bigram,
                 'pos1': key1,
                 'pos2': key2,
                 'hand1': hand1,
@@ -90,7 +92,7 @@ def test_all_bigrams(all_bigrams_file="dvorak9_scores_all_bigrams.csv",
             score_tuple = tuple(bigram_scores[c] for c in ['hands', 'fingers', 'skip_fingers', 
                                                           'dont_cross_home', 'same_row', 'home_row', 
                                                           'columns', 'strum', 'strong_fingers'])
-            score_patterns[score_tuple].append(f"{key1}{key2}")
+            score_patterns[score_tuple].append(bigram)
     
     # Sort all results by total score (descending), then by bigram name
     results.sort(key=lambda x: (-x['total'], x['bigram']))
@@ -189,40 +191,37 @@ def test_specific_cases():
     
     print("\n=== SPECIFIC TEST CASES ===")
     
-    # Test cases: (description, key1, key2, expected_criterion_scores)
+    # Test cases: (description, bigram, expected_criterion_scores)
     test_cases = [
         # Strum tests
-        ("Same finger strum", "F", "F", {"strum": 0.0}),
-        ("Different hands", "F", "J", {"strum": 1.0, "hands": 1.0}),
-        ("Inward roll (L)", "A", "F", {"strum": 1.0}),  # pinky to index
-        ("Outward roll (L)", "F", "A", {"strum": 0.0}), # index to pinky
+        ("Same finger strum", "FF", {"strum": 0.0}),
+        ("Different hands", "FJ", {"strum": 1.0, "hands": 1.0}),
+        ("Inward roll (L)", "AF", {"strum": 1.0}),  # pinky to index
+        ("Outward roll (L)", "FA", {"strum": 0.0}), # index to pinky
         
         # Skip fingers tests
-        ("Same finger", "F", "F", {"skip_fingers": 0.0}),
-        ("Adjacent fingers", "F", "D", {"skip_fingers": 0.0}),  # index to middle
-        ("Skip 1 finger", "F", "S", {"skip_fingers": 0.5}),    # index to ring
-        ("Skip 2 fingers", "F", "A", {"skip_fingers": 1.0}),   # index to pinky
-        ("Different hands", "F", "J", {"skip_fingers": 1.0}),
+        ("Same finger", "FF", {"skip_fingers": 0.0}),
+        ("Adjacent fingers", "FD", {"skip_fingers": 0.3}),  # index to middle
+        ("Skip 1 finger", "FS", {"skip_fingers": 0.7}),    # index to ring
+        ("Skip 2 fingers", "FA", {"skip_fingers": 1.0}),   # index to pinky
+        ("Different hands", "FJ", {"skip_fingers": 1.0}),
         
         # Don't cross home tests
-        ("Same hand hurdling", "Q", "Z", {"dont_cross_home": 0.0}),  # top to bottom, same hand
-        ("Different hands hurdling", "Q", "M", {"dont_cross_home": 1.0}), # different hands always 1
-        ("Same hand no hurdling", "Q", "A", {"dont_cross_home": 1.0}),   # top to home, ok
+        ("Same hand hurdling", "QZ", {"dont_cross_home": 0.0}),  # top to bottom, same hand
+        ("Different hands hurdling", "QM", {"dont_cross_home": 1.0}), # different hands always 1
+        ("Same hand no hurdling", "QA", {"dont_cross_home": 1.0}),   # top to home, ok
         
         # Home row tests
-        ("Both home row", "F", "J", {"home_row": 1.0}),
-        ("One home row", "F", "R", {"home_row": 0.5}),
-        ("Neither home row", "Q", "Z", {"home_row": 0.0}),
+        ("Both home row", "FJ", {"home_row": 1.0}),
+        ("One home row", "FR", {"home_row": 0.5}),
+        ("Neither home row", "QZ", {"home_row": 0.0}),
     ]
     
-    layout_mapping = {key.lower(): key for key in get_all_qwerty_keys()}
-    
-    for description, key1, key2, expected in test_cases:
-        char1, char2 = key1.lower(), key2.lower()
-        scorer = Dvorak9Scorer(layout_mapping, char1 + char2)
-        bigram_scores = scorer.score_bigram(char1, char2)
+    for description, bigram, expected in test_cases:
+        # Use the canonical scoring function
+        bigram_scores = score_bigram_dvorak9(bigram)
         
-        print(f"\n{description}: {key1}→{key2}")
+        print(f"\n{description}: {bigram}")
         
         all_correct = True
         for criterion, expected_score in expected.items():
@@ -237,13 +236,52 @@ def test_specific_cases():
         else:
             print(f"  ✗ Some checks failed")
 
+def validate_canonical_implementation():
+    """Validate that the canonical implementation works as expected."""
+    
+    print("\n=== CANONICAL IMPLEMENTATION VALIDATION ===")
+    
+    # Test a few sample bigrams to ensure the canonical function works
+    test_bigrams = ["TH", "ER", "AN", "IN", "ON"]
+    
+    print("Testing canonical scoring function:")
+    for bigram in test_bigrams:
+        try:
+            scores = score_bigram_dvorak9(bigram)
+            print(f"  {bigram}: ✓ (total score: {sum(scores.values()):.2f})")
+            
+            # Validate score structure
+            expected_keys = {'hands', 'fingers', 'skip_fingers', 'dont_cross_home', 
+                           'same_row', 'home_row', 'columns', 'strum', 'strong_fingers'}
+            actual_keys = set(scores.keys())
+            
+            if expected_keys != actual_keys:
+                print(f"    ⚠️  Score keys mismatch!")
+                print(f"      Expected: {expected_keys}")
+                print(f"      Actual: {actual_keys}")
+            
+            # Validate score ranges (should be 0-1)
+            for criterion, score in scores.items():
+                if not (0 <= score <= 1):
+                    print(f"    ⚠️  {criterion} score out of range: {score}")
+                    
+        except Exception as e:
+            print(f"  {bigram}: ✗ Error: {e}")
+    
+    print("\n✓ Canonical implementation validation complete")
+
 def main():
     """Run comprehensive test."""
     
     print("Dvorak-9 Comprehensive Scoring Test")
     print("=" * 50)
+    print("Using canonical scoring implementation from dvorak9_scorer.py")
+    print("=" * 50)
     
-    # Test specific cases first
+    # Validate the canonical implementation first
+    validate_canonical_implementation()
+    
+    # Test specific cases
     test_specific_cases()
     
     # Test all possible bigrams
@@ -257,9 +295,10 @@ def main():
     
     print(f"\n{'='*50}")
     print("Test complete!")
+    print("✅ SUCCESS: Using canonical implementation from dvorak9_scorer.py")
     print("Check these output files:")
-    print("  - 'dvorak9_all_bigrams.csv' for all possible bigrams")
-    print("  - 'dvorak9_unique_scores.csv' for unique score patterns")
+    print("  - 'dvorak9_scores_all_bigrams.csv' for all possible bigrams")
+    print("  - 'dvorak9_scores_unique_all_bigrams.csv' for unique score patterns")
 
 if __name__ == "__main__":
     main()

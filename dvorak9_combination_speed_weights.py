@@ -7,6 +7,11 @@ evaluation criteria using real typing data from 136M+ keystrokes. The analysis
 includes frequency adjustment, middle column key effects, and rigorous statistical
 testing with FDR correction.
 
+The dvorak_combinations_fdr_results.csv output file contains the results of the 
+statistical analysis, which provides empirical combination weights for each 
+possible combination of Dvorak criteria. The "combination" and "correlation" 
+columns are used by dvorak9_speed.py for scoring keyboard layouts.
+
 Key Features:
 - Analyzes correlations between each Dvorak criterion and actual typing speed
 - Controls for English bigram frequency effects using regression
@@ -43,8 +48,9 @@ The 9 scoring criteria for typing bigrams are:
 9. Strong fingers - favor stronger fingers over weaker ones
 
 Example usage:
-    python dvorak9_scorer.py --items "abc" --positions "FDJ" --text "abacaba"
-    python dvorak9_scorer.py --items "etaoinsrhldcumfp" --positions "FDESRJKUMIVLA;OW" --details
+    python dvorak9_combination_speed_weights.py
+    python dvorak9_combination_speed_weights.py --max-bigrams 100000
+    python dvorak9_combination_speed_weights.py --test-scorer
 """
 
 import pandas as pd
@@ -68,6 +74,10 @@ from itertools import combinations
 import argparse
 import sys
 import random
+
+# Import the canonical scoring function from dvorak9_scorer
+from dvorak9_scorer import score_bigram_dvorak9, Dvorak9Scorer
+
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -200,220 +210,6 @@ def load_empirical_weights(csv_file="dvorak_combinations_fdr_results.csv", signi
     
     return weights
 
-class Dvorak9Scorer:
-    """
-    Dvorak-9 scorer using real empirical combination weights.
-    
-    Uses actual correlations from 100k+ user analysis with FDR correction.
-    """
-    
-    def __init__(self, layout_mapping, text, weights_file="dvorak_combinations_fdr_results.csv"):
-        """
-        Initialize scorer with layout mapping and text.
-        
-        Args:
-            layout_mapping: Dict mapping characters to QWERTY positions
-            text: Text to analyze for bigram scoring
-            weights_file: Path to empirical weights CSV file
-        """
-        self.layout_mapping = layout_mapping
-        self.text = text.lower()
-        self.bigrams = self._extract_bigrams()
-        
-        # Load real empirical weights
-        self.combination_weights = load_empirical_weights(weights_file)
-        
-        # Fallback weights if file not available
-        if not self.combination_weights:
-            print("⚠️  Using fallback weights (empirical file not found)")
-            self.combination_weights = self._get_fallback_weights()
-
-    def _extract_bigrams(self):
-        """Extract all consecutive character pairs from text that exist in layout mapping."""
-        bigrams = []
-        
-        # Filter text to only characters in our layout
-        filtered_chars = [char for char in self.text if char in self.layout_mapping]
-        
-        # Create bigrams from consecutive characters
-        for i in range(len(filtered_chars) - 1):
-            char1, char2 = filtered_chars[i], filtered_chars[i + 1]
-            bigrams.append((char1, char2))
-        
-        return bigrams
-
-    def _get_fallback_weights(self):
-        """Fallback weights based on the CSV data shown."""
-        return {
-            # Individual features (from CSV)
-            ('hands',): 0.090,  # Positive = contradicts Dvorak
-            ('fingers',): -0.088,
-            ('same_row',): -0.088,
-            ('strum',): -0.087,
-            ('dont_cross_home',): -0.086,
-            ('home_row',): -0.058,
-            ('skip_fingers',): -0.041,
-            ('columns',): -0.035,
-            ('strong_fingers',): 0.013,  # Positive = contradicts Dvorak
-            
-            # Top 2-way combinations (from CSV sample)
-            ('fingers', 'same_row'): -0.120,
-            ('dont_cross_home', 'strum'): -0.113,
-            ('home_row', 'same_row'): -0.112,
-            ('dont_cross_home', 'fingers'): -0.111,
-            
-            # Default for no features
-            (): 0.0
-        }
-
-    def score_bigram(self, char1, char2):
-        """Score a single bigram according to the 9 Dvorak criteria."""
-        # Use the existing dvorak_9_criteria_bigrams function
-        return dvorak_9_criteria_bigrams(char1 + char2)
-
-    def _identify_combination(self, bigram_scores, threshold=0.8):
-        """
-        Identify which feature combination a bigram exhibits.
-        
-        Args:
-            bigram_scores: Dict of feature scores for a single bigram
-            threshold: Minimum score to consider a feature "active"
-        
-        Returns:
-            Tuple of active feature names, sorted for consistent lookup
-        """
-        active_features = []
-        
-        for feature, score in bigram_scores.items():
-            if score >= threshold:
-                active_features.append(feature)
-        
-        return tuple(sorted(active_features))
-
-    def _score_bigram_weighted(self, bigram_scores):
-        """
-        Score a single bigram using empirical combination-specific weights.
-        
-        Args:
-            bigram_scores: Dict of 9 feature scores for the bigram
-        
-        Returns:
-            Weighted score for this bigram
-        """
-        # Identify which combination this bigram exhibits
-        combination = self._identify_combination(bigram_scores)
-        
-        # Try to find exact match first
-        if combination in self.combination_weights:
-            weight = self.combination_weights[combination]
-            # Calculate combination strength (how well does bigram exhibit this combination)
-            if combination:
-                combination_strength = sum(bigram_scores[feature] for feature in combination) / len(combination)
-            else:
-                combination_strength = 0
-            return weight * combination_strength
-        
-        # Fall back to best partial match or individual features
-        best_weight = 0.0
-        best_score = 0.0
-        
-        for combo, weight in self.combination_weights.items():
-            if not combo:  # Skip empty combination
-                continue
-                
-            # Check if this bigram exhibits this combination (partial match allowed)
-            if all(feature in bigram_scores for feature in combo):
-                combo_strength = sum(bigram_scores[feature] for feature in combo) / len(combo)
-                
-                # Penalize partial matches
-                active_features = set(self._identify_combination(bigram_scores))
-                match_completeness = len(set(combo) & active_features) / len(combo)
-                adjusted_score = weight * combo_strength * match_completeness
-                
-                if abs(adjusted_score) > abs(best_score):
-                    best_score = adjusted_score
-        
-        return best_score
-
-    def calculate_scores(self):
-        """Calculate layout score using empirical combination weighting."""
-        if not self.bigrams:
-            return {
-                'total_weighted_score': 0.0,
-                'average_weighted_score': 0.0,
-                'bigram_count': 0,
-                'combination_breakdown': {},
-                'bigram_details': [],
-                'weights_source': 'none'
-            }
-        
-        total_weighted_score = 0.0
-        combination_counts = defaultdict(int)
-        combination_score_sums = defaultdict(float)
-        bigram_details = []
-        
-        # Score each bigram with empirical weighting
-        for char1, char2 in self.bigrams:
-            bigram_scores = self.score_bigram(char1, char2)
-            weighted_score = self._score_bigram_weighted(bigram_scores)
-            combination = self._identify_combination(bigram_scores)
-            
-            total_weighted_score += weighted_score
-            combination_counts[combination] += 1
-            combination_score_sums[combination] += weighted_score
-            
-            bigram_details.append({
-                'bigram': f"{char1}{char2}",
-                'scores': bigram_scores,
-                'combination': combination,
-                'weighted_score': weighted_score
-            })
-        
-        # Calculate combination breakdown
-        combination_breakdown = {}
-        for combo, count in combination_counts.items():
-            combination_breakdown[combo] = {
-                'count': count,
-                'total_contribution': combination_score_sums[combo],
-                'average_score': combination_score_sums[combo] / count if count > 0 else 0,
-                'percentage': count / len(self.bigrams) * 100
-            }
-        
-        return {
-            'total_weighted_score': total_weighted_score,
-            'average_weighted_score': total_weighted_score / len(self.bigrams),
-            'bigram_count': len(self.bigrams),
-            'combination_breakdown': combination_breakdown,
-            'bigram_details': bigram_details,
-            'weights_source': 'empirical' if len(self.combination_weights) > 10 else 'fallback'
-        }
-
-    def get_weights_summary(self):
-        """Get summary of the weights being used."""
-        print(f"\n📊 EMPIRICAL WEIGHTS SUMMARY:")
-        print(f"   Total combinations with weights: {len(self.combination_weights)}")
-        
-        # Group by k-way
-        by_k_way = defaultdict(list)
-        for combo, weight in self.combination_weights.items():
-            k = len(combo) if combo else 0
-            by_k_way[k].append((combo, weight))
-        
-        for k in sorted(by_k_way.keys()):
-            combos = by_k_way[k]
-            support_dvorak = sum(1 for _, w in combos if w < 0)
-            contradict_dvorak = sum(1 for _, w in combos if w > 0)
-            
-            print(f"   {k}-way combinations: {len(combos)} total")
-            print(f"     • Support Dvorak (negative): {support_dvorak}")
-            print(f"     • Contradict Dvorak (positive): {contradict_dvorak}")
-            
-            # Show strongest in this category
-            strongest = max(combos, key=lambda x: abs(x[1]))
-            combo_str = ' + '.join(strongest[0]) if strongest[0] else 'none'
-            direction = "supports" if strongest[1] < 0 else "contradicts"
-            print(f"     • Strongest: {combo_str} ({strongest[1]:.4f}, {direction} Dvorak)")
-
 def print_scoring_results(results):
     """Print formatted scoring results with empirical weight information."""
     print("Empirical Dvorak-9 Scoring Results")
@@ -452,118 +248,6 @@ def verify_frequency_data(freq_df):
         return False
     
     return True
-
-def dvorak_9_criteria_bigrams(bigram):
-    """Calculate all 9 Dvorak criteria scores for a bigram"""
-    scores = {}
-    
-    # QWERTY keyboard layout
-    layout = {
-        'q': (0, 0), 'w': (0, 1), 'e': (0, 2), 'r': (0, 3), 't': (0, 4), 'y': (0, 5), 'u': (0, 6), 'i': (0, 7), 'o': (0, 8), 'p': (0, 9),
-        'a': (1, 0), 's': (1, 1), 'd': (1, 2), 'f': (1, 3), 'g': (1, 4), 'h': (1, 5), 'j': (1, 6), 'k': (1, 7), 'l': (1, 8),
-        'z': (2, 0), 'x': (2, 1), 'c': (2, 2), 'v': (2, 3), 'b': (2, 4), 'n': (2, 5), 'm': (2, 6)
-    }
-    
-    # Finger assignments (QWERTY standard)
-    finger_map = {
-        'q': 'left_pinky', 'a': 'left_pinky', 'z': 'left_pinky',
-        'w': 'left_ring', 's': 'left_ring', 'x': 'left_ring',
-        'e': 'left_middle', 'd': 'left_middle', 'c': 'left_middle',
-        'r': 'left_index', 'f': 'left_index', 'v': 'left_index', 't': 'left_index', 'g': 'left_index', 'b': 'left_index',
-        'y': 'right_index', 'h': 'right_index', 'n': 'right_index', 'u': 'right_index', 'j': 'right_index', 'm': 'right_index',
-        'i': 'right_middle', 'k': 'right_middle',
-        'o': 'right_ring', 'l': 'right_ring',
-        'p': 'right_pinky'
-    }
-    
-    # Hand assignments
-    left_hand = {'q', 'w', 'e', 'r', 't', 'a', 's', 'd', 'f', 'g', 'z', 'x', 'c', 'v', 'b'}
-    right_hand = {'y', 'u', 'i', 'o', 'p', 'h', 'j', 'k', 'l', 'n', 'm'}
-    
-    # Home row keys
-    home_keys = {'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'}
-    
-    # Strong fingers (not pinky)
-    strong_fingers = {'left_index', 'left_middle', 'left_ring', 'right_index', 'right_middle', 'right_ring'}
-    
-    # Middle column keys (require index finger stretches)
-    middle_column_keys = {'t', 'g', 'b', 'y', 'h', 'n'}
-    
-    char1, char2 = bigram[0].lower(), bigram[1].lower()
-    
-    # Skip if characters not in layout
-    if char1 not in layout or char2 not in layout:
-        return {criterion: 0 for criterion in ['hands', 'fingers', 'skip_fingers', 'dont_cross_home', 'same_row', 'home_row', 'columns', 'strum', 'strong_fingers']}
-    
-    pos1, pos2 = layout[char1], layout[char2]
-    finger1, finger2 = finger_map[char1], finger_map[char2]
-    
-    # 1. Hand alternation
-    scores['hands'] = 1 if (char1 in left_hand) != (char2 in right_hand) else 0
-    
-    # 2. Different fingers  
-    scores['fingers'] = 1 if finger1 != finger2 else 0
-    
-    # 3. Skip fingers (avoid adjacent finger pairs)
-    finger_positions = {
-        'left_pinky': 0, 'left_ring': 1, 'left_middle': 2, 'left_index': 3,
-        'right_index': 4, 'right_middle': 5, 'right_ring': 6, 'right_pinky': 7
-    }
-    
-    if finger1 in finger_positions and finger2 in finger_positions:
-        finger_distance = abs(finger_positions[finger1] - finger_positions[finger2])
-        if finger_distance == 1:  # Adjacent fingers
-            scores['skip_fingers'] = 0
-        elif finger_distance == 0:  # Same finger
-            scores['skip_fingers'] = 0.5
-        else:  # Non-adjacent fingers
-            scores['skip_fingers'] = 1
-    else:
-        scores['skip_fingers'] = 0.5
-    
-    # 4. Don't cross over home row
-    row1, row2 = pos1[0], pos2[0]
-    if row1 == 1 or row2 == 1:  # If either is on home row
-        scores['dont_cross_home'] = 1
-    elif (row1 == 0 and row2 == 2) or (row1 == 2 and row2 == 0):  # Cross over home
-        scores['dont_cross_home'] = 0
-    else:
-        scores['dont_cross_home'] = 1
-    
-    # 5. Same row preference
-    scores['same_row'] = 1 if row1 == row2 else 0
-    
-    # 6. Home row preference  
-    scores['home_row'] = 1 if char1 in home_keys and char2 in home_keys else 0.5 if char1 in home_keys or char2 in home_keys else 0
-    
-    # 7. Column discipline (avoid same column)
-    col1, col2 = pos1[1], pos2[1]
-    if col1 == col2:
-        scores['columns'] = 0
-    elif abs(col1 - col2) == 1:  # Adjacent columns
-        scores['columns'] = 0.5
-    else:
-        scores['columns'] = 1
-    
-    # 8. Strum (inward to outward motion)
-    if char1 in left_hand and char2 in right_hand:
-        # Left to right: prefer left finger more central than right finger
-        left_centrality = 5 - abs(pos1[1] - 4.5)  # Distance from center
-        right_centrality = 5 - abs(pos2[1] - 4.5)
-        scores['strum'] = 1 if left_centrality > right_centrality else 0
-    elif char1 in right_hand and char2 in left_hand:
-        # Right to left: prefer right finger more central than left finger  
-        left_centrality = 5 - abs(pos2[1] - 4.5)
-        right_centrality = 5 - abs(pos1[1] - 4.5)
-        scores['strum'] = 1 if right_centrality > left_centrality else 0
-    else:
-        # Same hand - no strum benefit
-        scores['strum'] = 0
-    
-    # 9. Strong fingers (avoid pinky)
-    scores['strong_fingers'] = 1 if finger1 in strong_fingers and finger2 in strong_fingers else 0.5 if finger1 in strong_fingers or finger2 in strong_fingers else 0
-    
-    return scores
 
 def adjust_times_for_frequency(sequences, times, freq_df, sequence_type="sequences"):
     """Adjust typing times for linguistic frequency using regression"""
@@ -912,8 +596,8 @@ def analyze_correlations(sequences, times, criteria_names, group_name, analysis_
             elapsed = time.time() - start_time
             print_and_log(f"    Progress: {i:,}/{len(sequences):,} ({i/len(sequences)*100:.1f}%) - {elapsed:.1f}s", end='\r')
         
-        # Calculate Dvorak scores
-        scores = dvorak_9_criteria_bigrams(seq)
+        # Calculate Dvorak scores using the canonical function
+        scores = score_bigram_dvorak9(seq)
         
         # Validate scores
         if all(isinstance(score, (int, float)) and not np.isnan(score) for score in scores.values()):
@@ -2487,130 +2171,6 @@ def analyze_all_results_with_fdr(results, combination_results=None):
     
     return all_individual_results, significant_combinations if 'significant_combinations' in locals() else []
 
-def get_combination_weights():
-    """Return weights for different feature combinations based on empirical analysis."""
-    return {
-        # 5-way combinations (strongest)
-        ('fingers', 'same_row', 'home_row', 'strum', 'strong_fingers'): -0.148,
-        
-        # 4-way combinations
-        ('fingers', 'same_row', 'home_row', 'strum'): -0.147,
-        ('fingers', 'same_row', 'home_row', 'strong_fingers'): -0.141,
-        ('fingers', 'same_row', 'strum', 'strong_fingers'): -0.138,
-        
-        # 3-way combinations (most robust)
-        ('fingers', 'same_row', 'strum'): -0.124,
-        ('fingers', 'same_row', 'home_row'): -0.119,
-        ('fingers', 'strum', 'strong_fingers'): -0.115,
-        
-        # 2-way combinations
-        ('fingers', 'same_row'): -0.106,
-        ('fingers', 'strum'): -0.102,
-        ('same_row', 'strum'): -0.098,
-        
-        # Individual features (base effects)
-        ('fingers',): -0.088,
-        ('strum',): -0.087,
-        ('same_row',): -0.088,
-        ('home_row',): -0.058,
-        ('strong_fingers',): -0.045,
-        ('skip_fingers',): -0.038,
-        ('columns',): -0.025,
-        ('dont_cross_home',): -0.018,
-        ('hands',): +0.090,  # Positive = bad for typing speed
-        
-        # Default for no features
-        (): 0.0
-    }
-
-def identify_bigram_combination(bigram_scores, threshold=0.8):
-    """
-    Identify which feature combination a bigram exhibits.
-    
-    Args:
-        bigram_scores: Dict of feature scores for a single bigram
-        threshold: Minimum score to consider a feature "active"
-    
-    Returns:
-        Tuple of active feature names, sorted for consistent lookup
-    """
-    active_features = []
-    
-    for feature, score in bigram_scores.items():
-        if score >= threshold:
-            active_features.append(feature)
-    
-    return tuple(sorted(active_features))
-
-def score_bigram_weighted(bigram_scores, combination_weights):
-    """
-    Score a single bigram using combination-specific weights.
-    
-    Args:
-        bigram_scores: Dict of 9 feature scores for the bigram
-        combination_weights: Dict mapping combinations to empirical weights
-    
-    Returns:
-        Weighted score for this bigram
-    """
-    # Identify which combination this bigram exhibits
-    combination = identify_bigram_combination(bigram_scores)
-    
-    # Try to find exact match first
-    if combination in combination_weights:
-        weight = combination_weights[combination]
-        # Calculate combination strength (how well does bigram exhibit this combination)
-        combination_strength = sum(bigram_scores[feature] for feature in combination) / len(combination) if combination else 0
-        return weight * combination_strength
-    
-    # Fall back to best partial match
-    best_weight = 0.0
-    best_score = 0.0
-    
-    for combo, weight in combination_weights.items():
-        if not combo:  # Skip empty combination
-            continue
-            
-        # Check if this bigram exhibits this combination (partial match allowed)
-        if all(feature in bigram_scores for feature in combo):
-            combo_strength = sum(bigram_scores[feature] for feature in combo) / len(combo)
-            
-            # Penalize partial matches
-            match_completeness = len(set(combo) & set(identify_bigram_combination(bigram_scores))) / len(combo)
-            adjusted_score = weight * combo_strength * match_completeness
-            
-            if abs(adjusted_score) > abs(best_score):
-                best_score = adjusted_score
-    
-    return best_score
-
-def print_combination_results(results):
-    """Print formatted results from combination scoring."""
-    print("Dvorak-9 Combination Scoring Results")
-    print("=" * 70)
-    
-    print(f"Total Weighted Score: {results['total_weighted_score']:8.3f}")
-    print(f"Average per Bigram:   {results['average_weighted_score']:8.3f}")
-    print(f"Bigrams Analyzed:     {results['bigram_count']:8d}")
-    
-    print("\nCombination Breakdown:")
-    print("-" * 70)
-    print(f"{'Combination':<35} {'Count':<8} {'Contrib':<10} {'Avg':<8} {'%':<6}")
-    print("-" * 70)
-    
-    # Sort by total contribution
-    sorted_combos = sorted(results['combination_breakdown'].items(), 
-                          key=lambda x: abs(x[1]['total_contribution']), 
-                          reverse=True)
-    
-    for combo, stats in sorted_combos[:15]:  # Top 15 combinations
-        combo_str = '+'.join(combo) if combo else 'none'
-        if len(combo_str) > 34:
-            combo_str = combo_str[:31] + '...'
-        
-        print(f"{combo_str:<35} {stats['count']:<8} {stats['total_contribution']:<10.3f} "
-              f"{stats['average_score']:<8.3f} {stats['percentage']:<6.1f}")
-
 def analyze_weight_distribution(csv_file="dvorak_combinations_fdr_results.csv"):
     """Analyze the distribution of weights in the empirical data."""
     print(f"\n📈 ANALYZING EMPIRICAL WEIGHT DISTRIBUTION")
@@ -2671,9 +2231,6 @@ def test_empirical_scorer():
     scorer = Dvorak9Scorer(layout_mapping, text)
     results = scorer.calculate_scores()
     
-    # Show weights summary
-    scorer.get_weights_summary()
-    
     # Show scoring results
     print()
     print_scoring_results(results)
@@ -2726,7 +2283,7 @@ def main():
     print_and_log(f"  Random seed: {args.random_seed}")
     print_and_log(f"  Middle column keys: {', '.join(sorted(middle_column_keys))}")
     print_and_log("  Analysis includes both raw and frequency-adjusted correlations")
-    print_and_log("  Using empirical combination weights from FDR analysis")
+    print_and_log("  Using canonical scoring from dvorak9_scorer.py")
     print_and_log("")
     
     # Load frequency data
@@ -2790,25 +2347,14 @@ def main():
     print_and_log("=" * 80)
     print_and_log(f"Total runtime: {format_time(total_elapsed)}")
     print_and_log(f"Dvorak-9 Analysis Complete")
-    print_and_log("Now using unified scorer with empirical combination weighting")
+    print_and_log("Now using canonical scorer from dvorak9_scorer.py")
     
     # Save log
     save_log()
 
 if __name__ == "__main__":
-
     # Check if we want to run tests or full analysis
     if len(sys.argv) > 1 and sys.argv[1] == "--test-weights":
-        # Analyze the weight distribution
-        analyze_weight_distribution()
-        
-        # Test the scorer
-        test_empirical_scorer()
-    else:
-        # Run the full analysis
-        main()
-    # Check if we want to run tests or full analysis
-    if len(sys.argv) > 1 and sys.argv[1] == "--test":
         # Analyze the weight distribution
         analyze_weight_distribution()
         
