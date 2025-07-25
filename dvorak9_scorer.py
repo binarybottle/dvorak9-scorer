@@ -19,11 +19,12 @@ The 9 scoring criteria for typing bigrams are (0-1, higher = better performance)
 The combined layout score is calculated as the negative of the empirical weighted combination score,
 so that HIGHER scores indicate BETTER layouts (consistent with individual criteria).
 
-Requires a weights CSV file (e.g., empirical weights derived from 136M+ keystroke dataset 
-analysis with FDR correction).
+Requires a weights CSV file.
+NOTE: The empirical weights derived from 136M+ keystroke dataset analysis with FDR correction
+tested 511 combinations, which should cover most real bigrams reasonably well.
 
 # Basic scoring
-poetry run python3 dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./"  --weights-csv "weights/dvorak9_weights.csv"
+poetry run python3 dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./"  --weights-csv "weights/dvorak9_weights_speed.csv"
 
 python dvorak9_scorer.py --items "etaoinsrhldcumfp" --positions "FDESRJKUMIVLA;OW"
 
@@ -219,7 +220,7 @@ def score_bigram_dvorak9(bigram: str) -> Dict[str, float]:
     
     return scores
 
-def load_combination_weights(csv_path: str = "weights/dvorak9_weights.csv"):
+def load_combination_weights(csv_path: str = "weights/dvorak9_weights_speed.csv"):
     """
     Load empirical correlation weights for different feature combinations from CSV file.
     
@@ -355,7 +356,7 @@ class Dvorak9Scorer:
     empirical weights derived from analysis of real typing performance data.
     """
     
-    def __init__(self, layout_mapping: Dict[str, str], text: str, weights_csv: str = "weights/dvorak9_weights.csv"):
+    def __init__(self, layout_mapping: Dict[str, str], text: str, weights_csv: str = "weights/dvorak9_weights_speed.csv"):
         """
         Initialize scorer with layout mapping and text.
         
@@ -567,7 +568,7 @@ Examples:
   python dvorak9_scorer.py --items "abc" --positions "FDJ"
   
   # Use custom weights file
-  python dvorak9_scorer.py --items "abc" --positions "FDJ" --weights-csv "weights/dvorak9_weights.csv"
+  python dvorak9_scorer.py --items "abc" --positions "FDJ" --weights-csv "weights/dvorak9_weights_speed.csv"
 
   # QWERTY to QWERTY
   poetry run python3 dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./"
@@ -590,7 +591,7 @@ Examples:
                        help="Text to analyze (default: uses items string)")
     parser.add_argument("--text-file",
                        help="Path to text file to analyze (alternative to --text)")
-    parser.add_argument("--weights-csv", default="weights/dvorak9_weights.csv",
+    parser.add_argument("--weights-csv", default="weights/dvorak9_weights_speed.csv",
                        help="Path to CSV file containing empirical combination weights")
     parser.add_argument("--details", action="store_true",
                        help="Show detailed breakdown with examples")
@@ -728,7 +729,7 @@ if __name__ == "__main__":
             print_combination_results(results)
         except FileNotFoundError as e:
             print(f"Error: {e}")
-            print("Please ensure 'dvorak9_weights.csv' is in the weights directory.")
+            print("Please ensure 'dvorak9_weights_speed.csv' is in the weights directory.")
             print("This file should contain the empirical combination weights.")
         except Exception as e:
             print(f"Error: {e}")

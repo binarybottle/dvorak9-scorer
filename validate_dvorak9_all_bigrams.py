@@ -1,4 +1,4 @@
-# test_dvorak9_all_bigrams.py
+# validate_dvorak9_all_bigrams.py
 """
 Comprehensive validation test of Dvorak-9 scoring criteria.
 
@@ -21,7 +21,7 @@ Features:
 - Provides comprehensive debugging output for criterion implementation
 
 Usage:
-python test_dvorak9_all_bigrams.py
+python validate_dvorak9_all_bigrams.py
 
 Outputs:
 dvorak9_scores_all_bigrams.csv
