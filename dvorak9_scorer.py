@@ -85,17 +85,17 @@ HOME_ROW = 2
 FINGER_COLUMNS = {
     # Left hand columns (4=leftmost to 1=rightmost)
     'L': {
-        4: ['Q', 'A', 'Z', '1'],           # Pinky column
-        3: ['W', 'S', 'X', '2'],           # Ring column  
-        2: ['E', 'D', 'C', '3'],           # Middle column
-        1: ['R', 'F', 'V', '4', '5']       # Index column (excludes T, G, B - lateral movement)
+        4: ['Q', 'A', 'Z', '1'],                                 # Pinky column
+        3: ['W', 'S', 'X', '2'],                                 # Ring column  
+        2: ['E', 'D', 'C', '3'],                                 # Middle column
+        1: ['R', 'F', 'V', '4'] #'T', 'G', 'B', '5']             # Index column
     },
     # Right hand columns (1=leftmost to 4=rightmost)  
     'R': {
-        1: ['U', 'J', 'M', '6', '7'],      # Index column (excludes Y, H, N - lateral movement)
-        2: ['I', 'K', ',', '8'],           # Middle column
-        3: ['O', 'L', '.', '9'],           # Ring column
-        4: ['P', ';', '/', '0', "'", '[', ']', '\\', '-', '=']  # Pinky column
+        1: ['U', 'J', 'M', '7'], #'Y', 'H', 'N', '6'],           # Index column
+        2: ['I', 'K', ',', '8'],                                 # Middle column
+        3: ['O', 'L', '.', '9'],                                 # Ring column
+        4: ['P', ';', '/', '0']  #"'", '[', ']', '\\', '-', '='] # Pinky column
     }
 }
 
@@ -105,8 +105,7 @@ def get_key_info(key: str) -> Tuple[int, int, str]:
     if key in QWERTY_LAYOUT:
         return QWERTY_LAYOUT[key]
     else:
-        # Default for unknown keys
-        return (2, 1, 'R')
+        return None
 
 def is_finger_in_column(key: str, finger: int, hand: str) -> bool:
     """Check if a key is in the designated column for a finger."""
@@ -114,6 +113,111 @@ def is_finger_in_column(key: str, finger: int, hand: str) -> bool:
     if hand in FINGER_COLUMNS and finger in FINGER_COLUMNS[hand]:
         return key in FINGER_COLUMNS[hand][finger]
     return False
+
+def score_bigram_dvorak9(bigram: str) -> Dict[str, float]:
+    """
+    Calculate all 9 Dvorak criteria scores for a bigram.
+        
+    Args:
+        bigram: Two-character string (e.g., "th", "er")
+        
+    Returns:
+        Dict with keys: hands, fingers, skip_fingers, dont_cross_home, same_row, 
+                       home_row, columns, strum, strong_fingers
+        Values are 0-1 where higher = better for typing speed according to Dvorak principles
+    """
+    if len(bigram) != 2:
+        # Return neutral scores for invalid input
+        return {criterion: 0.5 for criterion in ['hands', 'fingers', 'skip_fingers', 'dont_cross_home', 
+                                                'same_row', 'home_row', 'columns', 'strum', 'strong_fingers']}
+    
+    char1, char2 = bigram[0].upper(), bigram[1].upper()
+    
+    # Get key information
+    row1, finger1, hand1 = get_key_info(char1)
+    row2, finger2, hand2 = get_key_info(char2)
+    
+    scores = {}
+    
+    # 1. Hands - favor alternating hands
+    scores['hands'] = 1.0 if hand1 != hand2 else 0.0
+    
+    # 2. Fingers - avoid same finger repetition
+    if hand1 != hand2:
+        scores['fingers'] = 1.0  # Different hands = different fingers
+    else:
+        scores['fingers'] = 0.0 if finger1 == finger2 else 1.0
+    
+    # 3. Skip fingers - favor skipping more fingers (same hand only)
+    if hand1 != hand2:
+        scores['skip_fingers'] = 1.0      # Different hands is good
+    elif finger1 == finger2:
+        scores['skip_fingers'] = 0.0      # Same finger is bad
+    else:
+        finger_gap = abs(finger1 - finger2)
+        if finger_gap == 1:
+            scores['skip_fingers'] = 0    # Adjacent fingers is bad
+        elif finger_gap == 2:
+            scores['skip_fingers'] = 0.5  # Skipping 1 finger is good
+        elif finger_gap == 3:
+            scores['skip_fingers'] = 1.0  # Skipping 2 fingers is better
+    
+    # 4. Don't cross home - avoid hurdling over home row
+    if hand1 != hand2:
+        scores['dont_cross_home'] = 1.0  # Different hands always score well
+    else:
+        # Check for hurdling (top to bottom or bottom to top, skipping home)
+        if (row1 == 1 and row2 == 3) or (row1 == 3 and row2 == 1):
+            scores['dont_cross_home'] = 0.0  # Hurdling over home row
+        else:
+            scores['dont_cross_home'] = 1.0  # No hurdling
+    
+    # 5. Same row - favor staying in same row
+    scores['same_row'] = 1.0 if row1 == row2 else 0.0
+    
+    # 6. Home row - favor using home row
+    home_count = sum(1 for row in [row1, row2] if row == HOME_ROW)
+    if home_count == 2:
+        scores['home_row'] = 1.0      # Both in home row
+    elif home_count == 1:
+        scores['home_row'] = 0.5      # One in home row
+    else:
+        scores['home_row'] = 0.0      # Neither in home row
+    
+    # 7. Columns - favor fingers staying in their designated columns
+    in_column1 = is_finger_in_column(char1, finger1, hand1)
+    in_column2 = is_finger_in_column(char2, finger2, hand2)
+    
+    if in_column1 and in_column2:
+        scores['columns'] = 1.0       # Both in correct columns
+    elif in_column1 or in_column2:
+        scores['columns'] = 0.5       # One in correct column
+    else:
+        scores['columns'] = 0.0       # Neither in correct column
+    
+    # 8. Strum - favor inward rolls (outer to inner fingers)
+    if hand1 != hand2:
+        scores['strum'] = 1.0         # Different hands get full score
+    elif finger1 == finger2:
+        scores['strum'] = 0.0         # Same finger gets zero
+    else:
+        # Inward roll: from higher finger number to lower (4→3→2→1)
+        # This represents rolling from pinky toward index finger
+        if finger1 > finger2:
+            scores['strum'] = 1.0     # Inward roll (e.g., pinky to ring, ring to middle)
+        else:
+            scores['strum'] = 0.0     # Outward roll (e.g., index to middle, middle to ring)
+    
+    # 9. Strong fingers - favor index and middle fingers
+    strong_count = sum(1 for finger in [finger1, finger2] if finger in STRONG_FINGERS)
+    if strong_count == 2:
+        scores['strong_fingers'] = 1.0    # Both strong fingers
+    elif strong_count == 1:
+        scores['strong_fingers'] = 0.5    # One strong finger
+    else:
+        scores['strong_fingers'] = 0.0    # Both weak fingers
+    
+    return scores
 
 def load_combination_weights(csv_path: str = "dvorak9_weights.csv"):
     """
@@ -181,7 +285,7 @@ def load_combination_weights(csv_path: str = "dvorak9_weights.csv"):
     
     return combination_weights
 
-def identify_bigram_combination(bigram_scores, threshold=0.8):
+def identify_bigram_combination(bigram_scores, threshold=0):
     """
     Identify which feature combination a bigram exhibits.
     
@@ -221,8 +325,9 @@ def score_bigram_weighted(bigram_scores, combination_weights):
         combination_strength = sum(bigram_scores[feature] for feature in combination) / len(combination) if combination else 0
         return weight * combination_strength
     
+    print(f"Warning: No exact combination match for {combination}. Using best partial match.")
+
     # Fall back to best partial match
-    best_weight = 0.0
     best_score = 0.0
     
     for combo, weight in combination_weights.items():
@@ -288,92 +393,12 @@ class Dvorak9Scorer:
 
     def score_bigram(self, char1: str, char2: str) -> Dict[str, float]:
         """Score a single bigram according to the 9 Dvorak criteria."""
-        pos1 = self.layout_mapping[char1]
-        pos2 = self.layout_mapping[char2]
+        # Map characters through layout to QWERTY positions
+        pos1 = self.layout_mapping.get(char1, char1.upper())
+        pos2 = self.layout_mapping.get(char2, char2.upper())
         
-        row1, finger1, hand1 = get_key_info(pos1)
-        row2, finger2, hand2 = get_key_info(pos2)
-        
-        scores = {}
-        
-        # 1. Hands - favor alternating hands
-        scores['hands'] = 1.0 if hand1 != hand2 else 0.0
-        
-        # 2. Fingers - avoid same finger repetition
-        if hand1 != hand2:
-            scores['fingers'] = 1.0  # Different hands = different fingers
-        else:
-            scores['fingers'] = 0.0 if finger1 == finger2 else 1.0
-        
-        # 3. Skip fingers - favor skipping more fingers (same hand only)
-        if hand1 != hand2:
-            scores['skip_fingers'] = 1.0  # Different hands
-        elif finger1 == finger2:
-            scores['skip_fingers'] = 0.0  # Same finger
-        else:
-            finger_gap = abs(finger1 - finger2)
-            if finger_gap == 1:
-                scores['skip_fingers'] = 0.0  # Adjacent fingers (skip 0)
-            elif finger_gap == 2:
-                scores['skip_fingers'] = 0.5  # Skip 1 finger
-            else:  # finger_gap == 3
-                scores['skip_fingers'] = 1.0  # Skip 2 fingers (index to pinky)
-        
-        # 4. Don't cross home - avoid hurdling over home row
-        if hand1 != hand2:
-            scores['dont_cross_home'] = 1.0  # Different hands always score well
-        else:
-            # Check for hurdling (top to bottom or bottom to top, skipping home)
-            if (row1 == 1 and row2 == 3) or (row1 == 3 and row2 == 1):
-                scores['dont_cross_home'] = 0.0  # Hurdling over home row
-            else:
-                scores['dont_cross_home'] = 1.0  # No hurdling
-        
-        # 5. Same row - favor staying in same row
-        scores['same_row'] = 1.0 if row1 == row2 else 0.0
-        
-        # 6. Home row - favor using home row
-        home_count = sum(1 for row in [row1, row2] if row == HOME_ROW)
-        if home_count == 2:
-            scores['home_row'] = 1.0      # Both in home row
-        elif home_count == 1:
-            scores['home_row'] = 0.5      # One in home row
-        else:
-            scores['home_row'] = 0.0      # Neither in home row
-        
-        # 7. Columns - favor fingers staying in their designated columns
-        in_column1 = is_finger_in_column(pos1, finger1, hand1)
-        in_column2 = is_finger_in_column(pos2, finger2, hand2)
-        
-        if in_column1 and in_column2:
-            scores['columns'] = 1.0       # Both in correct columns
-        elif in_column1 or in_column2:
-            scores['columns'] = 0.5       # One in correct column
-        else:
-            scores['columns'] = 0.0       # Neither in correct column
-        
-        # 8. Strum - favor inward rolls (outer to inner fingers)
-        if hand1 != hand2:
-            scores['strum'] = 1.0         # Different hands
-        elif finger1 == finger2:
-            scores['strum'] = 0.0         # Same finger
-        else:
-            # Inward roll: from higher finger number to lower (4→3→2→1)
-            if finger1 > finger2:
-                scores['strum'] = 1.0     # Inward roll
-            else:
-                scores['strum'] = 0.0     # Outward roll
-        
-        # 9. Strong fingers - favor index and middle fingers
-        strong_count = sum(1 for finger in [finger1, finger2] if finger in STRONG_FINGERS)
-        if strong_count == 2:
-            scores['strong_fingers'] = 1.0    # Both strong fingers
-        elif strong_count == 1:
-            scores['strong_fingers'] = 0.5    # One strong finger
-        else:
-            scores['strong_fingers'] = 0.0    # Both weak fingers
-        
-        return scores
+        # Use the canonical scoring function
+        return score_bigram_dvorak9(pos1 + pos2)
 
     def calculate_scores(self):
         """Calculate layout score using empirical combination weighting."""
@@ -443,8 +468,8 @@ class Dvorak9Scorer:
 
         return {
             'layout_score': average_weighted_score,  # Primary metric
-            'average_weighted_score': average_weighted_score,  # Keep existing name
-            'total_weighted_score': total_weighted_score,  # Keep for backwards compatibility
+            'average_weighted_score': average_weighted_score,
+            'total_weighted_score': total_weighted_score,
             'bigram_count': len(self.bigrams),
             'individual_scores': individual_scores,
             'combination_breakdown': combination_breakdown,
@@ -460,7 +485,8 @@ class Dvorak9Scorer:
         
         for char1, char2 in self.bigrams:
             bigram_scores = self.score_bigram(char1, char2)
-            pos1, pos2 = self.layout_mapping[char1], self.layout_mapping[char2]
+            pos1 = self.layout_mapping.get(char1, char1.upper())
+            pos2 = self.layout_mapping.get(char2, char2.upper())
             
             for criterion, score in bigram_scores.items():
                 example = f"{char1}{char2} ({pos1}{pos2})"

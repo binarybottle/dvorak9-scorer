@@ -19,13 +19,14 @@ A comprehensive implementation and validation of August Dvorak's 9 evaluation cr
 ## Required File
 - `dvorak9_weights.csv` 
   - Empirical combination weights from statistical analysis. This file should contain 'combination' and 'correlation' columns mapping feature combinations to their empirical correlations with typing speed.
+- `bigram_times.csv` (from https://github.com/binarybottle/process_3.5M_keystrokes) and `letter_pair_frequencies_english.csv` are ONLY required to run test_dvorak9_speed.py.
 
 ## Data sources
 
 ### Typing Performance Data
 Real typing data from the 136M Keystrokes dataset:
 - **Source**: Correctly typed bigrams from correctly typed words only
-- **Processing**: See [process_3.5M_keystrokes](https://github.com/binarybottle/process_3.5M_keystrokes)
+- **Processing**: See [process_3.5M_keystrokes](https://github.com/binarybottle/process_3.5M_keystrokes) `bigram_times.csv` output
 - **Reference**: 
 Vivek Dhakal, Anna Maria Feit, Per Ola Kristensson, Antti Oulasvirta. 
 Observations on Typing from 136 Million Keystrokes. 
