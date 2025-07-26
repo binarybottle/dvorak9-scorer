@@ -20,8 +20,10 @@ The combined layout score is calculated as the negative of the empirical weighte
 so that HIGHER scores indicate BETTER layouts (consistent with individual criteria).
 
 Requires a weights CSV file.
-NOTE: The empirical weights derived from 136M+ keystroke dataset analysis with FDR correction
-tested 511 combinations, which should cover most real bigrams reasonably well.
+  - NOTE: The empirical weights derived from 136M+ keystroke dataset analysis with FDR correction
+          tested 511 combinations, which should cover most real bigrams reasonably well.
+  - NOTE: The empirical weights derived from the comfort scores keystroke dataset analysis with FDR correction
+          tested 511 combinations, which should cover most real bigrams reasonably well.
 
 # Basic scoring
 poetry run python3 dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./"  --weights-csv "weights/dvorak9_weights_speed.csv"
@@ -608,9 +610,22 @@ Examples:
             print(f"Error: Character count ({len(args.items)}) != Position count ({len(args.positions)})")
             return
         
-        # Create layout mapping
-        layout_mapping = dict(zip(args.items.lower(), args.positions.upper()))
+        # Filter to only letters, keeping corresponding positions
+        letter_pairs = [(char, pos) for char, pos in zip(args.items, args.positions) if char.isalpha()]
         
+        if not letter_pairs:
+            print("Error: No letters found in --items")
+            return
+        
+        # Reconstruct filtered strings
+        filtered_items = ''.join(pair[0] for pair in letter_pairs)
+        filtered_positions = ''.join(pair[1] for pair in letter_pairs)
+        
+        print(f"Filtered to letters only: '{filtered_items}' → '{filtered_positions}'")
+        
+        # Create layout mapping
+        layout_mapping = dict(zip(filtered_items.lower(), filtered_positions.upper()))
+
         # Determine text source (priority: text-file > text > items)
         if args.text_file:
             try:

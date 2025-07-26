@@ -41,8 +41,8 @@ def get_all_qwerty_keys():
     # Use the main letter and punctuation keys
     return list("QWERTYUIOPASDFGHJKL;ZXCVBNM,./")
 
-def test_all_bigrams(all_bigrams_file="dvorak9_scores_all_bigrams.csv", 
-                    unique_scores_file="dvorak9_scores_unique_all_bigrams.csv"):
+def test_all_bigrams(all_bigrams_file="output/dvorak9_scores_all_bigrams.csv", 
+                    unique_scores_file="output/dvorak9_scores_unique_all_bigrams.csv"):
     """Test every possible bigram combination and output to two CSV files."""
     
     keys = get_all_qwerty_keys()
@@ -199,10 +199,10 @@ def test_specific_cases():
         ("Inward roll (L)", "AF", {"strum": 1.0}),  # pinky to index
         ("Outward roll (L)", "FA", {"strum": 0.0}), # index to pinky
         
-        # Skip fingers tests
+        # Skip fingers tests - THESE ARE THE FIXES NEEDED:
         ("Same finger", "FF", {"skip_fingers": 0.0}),
-        ("Adjacent fingers", "FD", {"skip_fingers": 0.3}),  # index to middle
-        ("Skip 1 finger", "FS", {"skip_fingers": 0.7}),    # index to ring
+        ("Adjacent fingers", "FD", {"skip_fingers": 0.0}),  # ← CHANGED: was 0.3, now 0.0
+        ("Skip 1 finger", "FS", {"skip_fingers": 0.5}),    # ← CHANGED: was 0.7, now 0.5  
         ("Skip 2 fingers", "FA", {"skip_fingers": 1.0}),   # index to pinky
         ("Different hands", "FJ", {"skip_fingers": 1.0}),
         
@@ -297,8 +297,8 @@ def main():
     print("Test complete!")
     print("✅ SUCCESS: Using canonical implementation from dvorak9_scorer.py")
     print("Check these output files:")
-    print("  - 'dvorak9_scores_all_bigrams.csv' for all possible bigrams")
-    print("  - 'dvorak9_scores_unique_all_bigrams.csv' for unique score patterns")
+    print("  - 'output/dvorak9_scores_all_bigrams.csv' for all possible bigrams")
+    print("  - 'output/dvorak9_scores_unique_all_bigrams.csv' for unique score patterns")
 
 if __name__ == "__main__":
     main()

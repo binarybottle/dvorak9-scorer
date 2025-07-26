@@ -7,7 +7,7 @@ evaluation criteria using real typing data from 136M+ keystrokes. The analysis
 includes frequency adjustment, middle column key effects, and rigorous statistical
 testing with FDR correction.
 
-The dvorak9_combinations_significant_fdr_results.csv output file contains 
+The combinations_weights_from_speed_significant.csv output file contains 
 the results of the statistical analysis, which provides empirical combination 
 weights for each possible combination of Dvorak criteria. The "combination" and 
 "correlation" columns are used by dvorak9_speed.py for scoring keyboard layouts.
@@ -92,7 +92,7 @@ def print_and_log(*args, **kwargs):
     log_content.append(message)
     original_print(*args, **kwargs)
 
-def save_log(filename="output/dvorak9_combination_speed_results.txt"):
+def save_log(filename="output/combinations_weights_from_speed.log"):
     """Save log content to file"""
     global log_content
     with open(filename, 'w', encoding='utf-8') as f:
@@ -151,7 +151,7 @@ def load_frequency_data(freq_file_path):
         print_and_log(f"❌ Error loading frequency data: {e}")
         return None
 
-def load_empirical_weights(csv_file="output/dvorak9_combinations_fdr_results.csv", significance_threshold=0.05):
+def load_empirical_weights(csv_file="output/combinations_weights_from_speed.csv", significance_threshold=0.05):
     """
     Load empirical combination weights from FDR analysis results.
     
@@ -2068,7 +2068,7 @@ def analyze_all_results_with_fdr(results, combination_results=None):
             
             # SAVE TO CSV FILE
             combination_df = pd.DataFrame(all_combinations)
-            csv_filename = 'output/dvorak9_combinations_fdr_results.csv'
+            csv_filename = 'output/combinations_weights_from_speed.csv'
             combination_df.to_csv(csv_filename, index=False)
             print_and_log(f"💾 ALL COMBINATIONS SAVED TO: {csv_filename}")
             
@@ -2100,7 +2100,7 @@ def analyze_all_results_with_fdr(results, combination_results=None):
                 
                 # SAVE SIGNIFICANT COMBINATIONS TO SEPARATE CSV
                 sig_combination_df = pd.DataFrame(significant_combinations)
-                sig_csv_filename = 'output/dvorak9_combinations_significant_fdr.csv'
+                sig_csv_filename = 'output/combinations_weights_from_speed_significant.csv'
                 sig_combination_df.to_csv(sig_csv_filename, index=False)
                 print_and_log(f"💾 SIGNIFICANT COMBINATIONS SAVED TO: {sig_csv_filename}")
                 
@@ -2171,7 +2171,7 @@ def analyze_all_results_with_fdr(results, combination_results=None):
     
     return all_individual_results, significant_combinations if 'significant_combinations' in locals() else []
 
-def analyze_weight_distribution(csv_file="output/dvorak9_combinations_fdr_results.csv"):
+def analyze_weight_distribution(csv_file="output/combinations_weights_from_speed.csv"):
     """Analyze the distribution of weights in the empirical data."""
     print(f"\n📈 ANALYZING EMPIRICAL WEIGHT DISTRIBUTION")
     print("=" * 60)
