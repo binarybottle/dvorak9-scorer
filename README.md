@@ -75,18 +75,18 @@ English bigram frequencies for frequency adjustment and regression analysis.
 **Usage**:
 ```bash
 # Unweighted scoring (pure Dvorak theory)
-python dvorak9_scorer.py --items "eta;oinshrlm" --positions "FDESGJWXRTYZ" --no-weights --details
+python dvorak9_scorer.py --items "etaoinshrlcu" --positions "FDESGJWXRTYZ" --no-weights --details
 
 # Weighted scoring with speed-based weights
-python dvorak9_scorer.py --items "eta;oinshrlm" --positions "FDESGJWXRTYZ" \
+python dvorak9_scorer.py --items "etaoinshrlcu" --positions "FDESGJWXRTYZ" \
   --weights-csv "combinations_weights_from_speed_significant.csv"
 
 # Weighted scoring with comfort-based weights  
-python dvorak9_scorer.py --items "eta;oinshrlm" --positions "FDESGJWXRTYZ" \
+python dvorak9_scorer.py --items "etaoinshrlcu" --positions "FDESGJWXRTYZ" \
   --weights-csv "combinations_weights_from_comfort_significant.csv"
 
 # CSV output (unweighted)
-python dvorak9_scorer.py --items "eta;oinshrlm" --positions "FDESGJWXRTYZ" --no-weights --csv
+python dvorak9_scorer.py --items "etaoinshrlcu" --positions "FDESGJWXRTYZ" --no-weights --csv
 ```
 
 ### Speed-Based Analysis
@@ -228,7 +228,7 @@ print(f"Comfort score: {comfort_results['layout_score']:.3f}")
 ### Command Line Comparison
 ```bash
 # Compare all three scoring modes for the same layout
-ITEMS="eta;oinshr"; POSITIONS="FDESGJWXRT"
+ITEMS="etaoinshrlcu"; POSITIONS="FDESGJWXRTYZ"
 
 # Unweighted (pure theory)
 poetry run python3 dvorak9_scorer.py --items "$ITEMS" --positions "$POSITIONS" --no-weights --ten-scores
