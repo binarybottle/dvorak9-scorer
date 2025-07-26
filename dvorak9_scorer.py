@@ -29,16 +29,16 @@ python dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "Q
 python dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./" --weights-csv "weights/combinations_weights_from_comfort_significant.csv"
 
 # Unweighted scoring (0-1 individual criteria only)
-python dvorak9_scorer.py --items "etaoinsrhldcumfp" --positions "FDESRJKUMIVLA;OW" --no-weights
+python dvorak9_scorer.py --items "eta;oinshr" --positions "FDESGJWXRT" --no-weights
 
 # With detailed breakdown
-python dvorak9_scorer.py --items "abc" --positions "FDJ" --details --no-weights
+python dvorak9_scorer.py --items "eta;oinshr" --positions "FDESGJWXRT" --details --no-weights
 
 # CSV export for analysis
-python dvorak9_scorer.py --items "abc" --positions "FDJ" --csv --no-weights
+python dvorak9_scorer.py --items "eta;oinshr" --positions "FDESGJWXRT" --csv --no-weights
 
 # Return just the 10 scores (average + 9 individual scores)
-python dvorak9_scorer.py --items "abc" --positions "FDJ" --ten-scores --no-weights
+python dvorak9_scorer.py --items "eta;oinshr" --positions "FDESGJWXRT" --ten-scores --no-weights
 
 """
 
@@ -455,6 +455,137 @@ class Dvorak9Scorer:
         if not self.bigrams:
             return {
                 'layout_score': 0.0,
+                'normalized_score': 0.0,
+                'theoretical_maximum': 1.0,
+                'average_weighted_score': 0.0,
+                'total_weighted_score': 0.0,
+                'bigram_count': 0,
+                'individual_scores': {},
+                'combination_breakdown': {},
+                'bigram_details': [],
+                'scoring_mode': 'unweighted' if self.combination_weights is None else 'weighted'
+            }
+        
+        # Initialize accumulators for individual unweighted scores
+        criterion_sums = defaultdict(float)
+        criterion_counts = defaultdict(int)
+        bigram_details = []
+        
+        # If we have weights, also track weighted scoring
+        if self.combination_weights is not None:
+            total_weighted_score = 0.0
+            combination_counts = defaultdict(int)
+            combination_score_sums = defaultdict(float)
+        
+        # Score each bigram
+        for char1, char2 in self.bigrams:
+            bigram_scores = self.score_bigram(char1, char2)
+            
+            # Always calculate individual criterion scores (unweighted)
+            for criterion, score in bigram_scores.items():
+                criterion_sums[criterion] += score
+                criterion_counts[criterion] += 1
+            
+            # Calculate weighted score if weights available
+            bigram_detail = {
+                'bigram': f"{char1}{char2}",
+                'scores': bigram_scores
+            }
+            
+            if self.combination_weights is not None:
+                weighted_score = score_bigram_weighted(bigram_scores, self.combination_weights)
+                combination = identify_bigram_combination(bigram_scores)
+                
+                # Apply correct sign based on weights type
+                # CRITICAL: Different weights types require different sign handling
+                if self.weights_type == 'speed':
+                    # Speed weights: negative correlation = good (faster typing)
+                    # Example: correlation = -0.14 means higher Dvorak score → faster typing
+                    # Flip sign so negative becomes positive contribution to layout score
+                    final_score = -weighted_score
+                else:  # comfort weights
+                    # Comfort weights: positive correlation = good (more comfortable) 
+                    # Example: correlation = +0.44 means higher Dvorak score → more comfortable
+                    # Keep original sign so positive stays positive contribution
+                    final_score = weighted_score
+                
+                total_weighted_score += final_score
+                combination_counts[combination] += 1
+                combination_score_sums[combination] += final_score
+                
+                bigram_detail.update({
+                    'combination': combination,
+                    'weighted_score': final_score
+                })
+            else:
+                # For unweighted, use sum of individual scores
+                unweighted_sum = sum(bigram_scores.values())
+                bigram_detail.update({
+                    'combination': tuple(sorted(bigram_scores.keys())),  # All criteria
+                    'weighted_score': unweighted_sum
+                })
+            
+            bigram_details.append(bigram_detail)
+        
+        # Calculate mean individual scores (always available)
+        individual_scores = {}
+        for criterion in ['hands', 'fingers', 'skip_fingers', 'dont_cross_home', 
+                         'same_row', 'home_row', 'columns', 'strum', 'strong_fingers']:
+            if criterion_counts[criterion] > 0:
+                individual_scores[criterion] = criterion_sums[criterion] / criterion_counts[criterion]
+            else:
+                individual_scores[criterion] = 0.0
+        
+        # Prepare results based on whether we have weights
+        if self.combination_weights is not None:
+            # Weighted scoring results
+            average_weighted_score = total_weighted_score / len(self.bigrams)
+            
+            # Calculate theoretical maximum and normalized score
+            theoretical_max = self.calculate_theoretical_maximum()
+            normalized_score = average_weighted_score / theoretical_max if theoretical_max > 0 else 0.0
+            
+            combination_breakdown = {}
+            for combo, count in combination_counts.items():
+                combination_breakdown[combo] = {
+                    'count': count,
+                    'total_contribution': combination_score_sums[combo],
+                    'average_score': combination_score_sums[combo] / count if count > 0 else 0,
+                    'percentage': count / len(self.bigrams) * 100
+                }
+
+            return {
+                'layout_score': average_weighted_score,  # Primary metric
+                'normalized_score': normalized_score,    # 0-1 normalized score
+                'theoretical_maximum': theoretical_max,  # Max possible for this weights type
+                'average_weighted_score': average_weighted_score,
+                'total_weighted_score': total_weighted_score,
+                'bigram_count': len(self.bigrams),
+                'individual_scores': individual_scores,
+                'combination_breakdown': combination_breakdown,
+                'bigram_details': bigram_details,
+                'scoring_mode': 'weighted',
+                'weights_type': self.weights_type
+            }
+        else:
+            # Unweighted scoring results - use average of individual scores
+            average_individual_score = sum(individual_scores.values()) / len(individual_scores)
+            total_individual_score = average_individual_score * len(self.bigrams)
+            
+            return {
+                'layout_score': average_individual_score,
+                'normalized_score': average_individual_score,  # Already 0-1 normalized
+                'theoretical_maximum': 1.0,  # Max possible for unweighted
+                'average_weighted_score': average_individual_score,
+                'total_weighted_score': total_individual_score,
+                'bigram_count': len(self.bigrams),
+                'individual_scores': individual_scores,
+                'combination_breakdown': {},  # No combinations in unweighted mode
+                'bigram_details': bigram_details,
+                'scoring_mode': 'unweighted'
+            }
+            return {
+                'layout_score': 0.0,
                 'average_weighted_score': 0.0,
                 'total_weighted_score': 0.0,
                 'bigram_count': 0,
@@ -577,23 +708,14 @@ class Dvorak9Scorer:
 
     def calculate_theoretical_maximum(self) -> float:
         """Calculate theoretical maximum possible score for current weights type."""
-        print(f"Debug: calculate_theoretical_maximum called")
-        print(f"Debug: combination_weights is None: {self.combination_weights is None}")
-        
         if self.combination_weights is None:
-            print(f"Debug: returning 1.0 for unweighted")
             return 1.0  # Unweighted maximum is 1.0 (average of all 1.0 scores)
-        
-        print(f"Debug: weights_type = {self.weights_type}")
-        print(f"Debug: number of combinations = {len(self.combination_weights)}")
         
         # For weighted scoring, find the highest magnitude correlation
         max_magnitude = 0.0
-        combinations_found = 0
         
         for combination, weight in self.combination_weights.items():
             if combination:  # Skip empty combination
-                combinations_found += 1
                 # Calculate what this combination would contribute with perfect scores
                 weighted_score = weight * 1.0  # All criteria in combination = 1.0
                 
@@ -606,18 +728,9 @@ class Dvorak9Scorer:
                 # Track the highest positive contribution possible
                 if final_score > max_magnitude:
                     max_magnitude = final_score
-                    
-                # Debug: show first few combinations
-                if combinations_found <= 3:
-                    combo_str = '+'.join(combination)
-                    print(f"Debug: {combo_str} weight={weight:.6f} final={final_score:.6f}")
-        
-        print(f"Debug: Found {combinations_found} combinations, max_magnitude={max_magnitude:.6f}")
         
         # Return the theoretical maximum
-        result = max_magnitude if max_magnitude > 0 else 1.0
-        print(f"Debug: returning {result:.6f}")
-        return result
+        return max_magnitude if max_magnitude > 0 else 1.0
 
     def get_detailed_breakdown(self) -> Dict[str, List[Dict]]:
         """Get detailed breakdown by criterion showing all bigrams with scores."""
