@@ -1,5 +1,5 @@
 # Dvorak-9 scorer: Theory, implementation, and empirical validation
-A comprehensive implementation and validation of August Dvorak's 9 evaluation criteria from his 1936 work "Typewriter Keyboard" and patent. This project bridges theoretical keyboard design principles with modern empirical analysis using real typing data and subjective comfort ratings.
+A comprehensive implementation and validation of August Dvorak's 9 evaluation criteria from his 1936 work "Typewriter Keyboard" and patent. This project bridges theoretical keyboard design principles with modern empirical analysis using real typing speed data and subjective comfort ratings.
 
 **Repository**: https://github.com/binarybottle/dvorak9-scorer.git  
 **Author**: Arno Klein (arnoklein.info)  
@@ -16,7 +16,21 @@ A comprehensive implementation and validation of August Dvorak's 9 evaluation cr
 8. Strum - favor inward rolls over outward rolls
 9. Strong fingers - favor stronger fingers over weaker ones
 
-## Required Files
+## Scoring Modes
+
+### Unweighted Scoring (Pure Dvorak Theory)
+- **Method**: Simple average of all 9 individual criteria (0-1 scale)
+- **Use case**: Testing pure Dvorak theoretical principles
+- **Advantages**: No external dependencies, interpretable scores
+- **Command**: `--no-weights`
+
+### Weighted Scoring (Empirically Validated)
+- **Method**: Combination-specific weights derived from real data
+- **Use case**: Practical layout evaluation with empirical validation
+- **Advantages**: Accounts for real-world typing patterns and preferences
+- **Files required**: Speed or comfort weights CSV
+
+## Required Files (for Weighted Scoring)
 
 ### Speed-Based Analysis
 - `combinations_weights_from_speed_significant.csv` - Empirical combination weights from speed analysis
@@ -52,6 +66,7 @@ English bigram frequencies for frequency adjustment and regression analysis.
 #### `dvorak9_scorer.py`
 **Purpose**: Calculate Dvorak-9 score for keyboard layouts
 **Key Features**:
+- **Dual scoring modes**: Unweighted (pure theory) and weighted (empirical)
 - Supports both speed-based and comfort-based weights
 - Filters to letters only (removes punctuation from analysis)
 - Respects word boundaries in bigram extraction
@@ -59,16 +74,19 @@ English bigram frequencies for frequency adjustment and regression analysis.
 
 **Usage**:
 ```bash
-# Score with speed-based weights
-python dvorak9_scorer.py --items "etaoinsrhldcumfp" --positions "FDESRJKUMIVLA;OW" \
+# Unweighted scoring (pure Dvorak theory)
+python dvorak9_scorer.py --items "eta;oinshrlm" --positions "FDESGJWXRTYZ" --no-weights --details
+
+# Weighted scoring with speed-based weights
+python dvorak9_scorer.py --items "eta;oinshrlm" --positions "FDESGJWXRTYZ" \
   --weights-csv "combinations_weights_from_speed_significant.csv"
 
-# Score with comfort-based weights  
-python dvorak9_scorer.py --items "etaoinsrhldcumfp" --positions "FDESRJKUMIVLA;OW" \
+# Weighted scoring with comfort-based weights  
+python dvorak9_scorer.py --items "eta;oinshrlm" --positions "FDESGJWXRTYZ" \
   --weights-csv "combinations_weights_from_comfort_significant.csv"
 
-# Get numerical scores only
-python dvorak9_scorer.py --items "abc" --positions "FDJ" --ten-scores
+# CSV output (unweighted)
+python dvorak9_scorer.py --items "eta;oinshrlm" --positions "FDESGJWXRTYZ" --no-weights --csv
 ```
 
 ### Speed-Based Analysis
@@ -91,8 +109,6 @@ python generate_combinations_weights_from_speed.py
 - Positive correlation = good (more comfortable)
 - No frequency adjustment needed (comfort independent of linguistic frequency)
 - Uses extended 30-key dataset with real + extrapolated comfort scores
-  (output from `extend_comfort_scores.py` in
-   https://github.com/binarybottle/typing_preferences_to_comfort_scores.git)
 - Tests all 511 combinations with FDR correction
 
 **Usage**:
@@ -105,24 +121,53 @@ python generate_combinations_weights_from_comfort.py --comfort-file input/estima
 **Purpose**: Comprehensive validation testing
 - Tests all 841 possible QWERTY bigram combinations
 - Validates expected criterion behaviors
+- Tests both weighted and unweighted scoring
 - Outputs diagnostic CSV files
 
 **Usage**:
 ```bash
+# Test unweighted scoring
+python validate_dvorak9_all_bigrams.py
+
+# Test with speed weights
 python validate_dvorak9_all_bigrams.py --weights-csv weights/combinations_weights_from_speed_significant.csv
+
+# Test with comfort weights
 python validate_dvorak9_all_bigrams.py --weights-csv weights/combinations_weights_from_comfort_significant.csv
 ```
 
-## Analysis Approaches
+## Scoring Mode Comparison
 
-### Speed vs. Comfort Analysis
-| Aspect | Speed Analysis | Comfort Analysis |
-|--------|---------------|------------------|
-| **Data Source** | 136M keystroke dataset | Subjective preference ratings |
-| **Correlation Direction** | Negative = good (faster) | Positive = good (more comfortable) |
-| **Frequency Control** | Yes (linguistic frequency adjustment) | No (comfort independent of frequency) |
-| **Coverage** | 30 keys (natural typing data) | 24→30 keys (extended via extrapolation) |
-| **Key Insight** | Speed vs. ergonomic principles | Comfort vs. ergonomic principles |
+| Aspect | Unweighted Scoring | Speed-Based Weights | Comfort-Based Weights |
+|--------|-------------------|-------------------|---------------------|
+| **Data Source** | Dvorak's theory only | 136M keystroke dataset | Subjective preference ratings |
+| **Calculation** | Average of 9 criteria | Empirical combination weights | Empirical combination weights |
+| **Dependencies** | None | Speed weights CSV | Comfort weights CSV |
+| **Correlation Direction** | N/A (theoretical) | Negative = good (faster) | Positive = good (more comfortable) |
+| **Frequency Control** | N/A | Yes (linguistic frequency adjustment) | No (comfort independent of frequency) |
+| **Coverage** | All layouts | 30 keys (natural typing data) | 24→30 keys (extended via extrapolation) |
+| **Use Case** | Pure theory testing | Performance optimization | Ergonomic optimization |
+| **Interpretability** | High (direct Dvorak scores) | Medium (empirically weighted) | Medium (empirically weighted) |
+
+### When to Use Each Mode
+
+- **Unweighted (`--no-weights`)**: 
+  - Testing pure Dvorak theoretical principles
+  - Educational purposes or research into historical claims
+  - When no empirical data is available
+  - Quick layout comparisons without external dependencies
+
+- **Speed-based weights**: 
+  - Optimizing layouts for typing speed
+  - Research comparing performance across layouts
+  - When empirical validation against real typing data is needed
+
+- **Comfort-based weights**:
+  - Optimizing layouts for user comfort and ergonomics
+  - When subjective user preferences are the priority
+  - Research into comfort vs. performance trade-offs
+
+## Analysis Approaches
 
 ### Extension Methodology
 For comfort analysis, missing middle column keys (t,g,y,h,b,n) are assigned the median comfort score from existing "same finger, adjacent row" bigrams, representing similar awkward finger movements.
@@ -137,24 +182,60 @@ For comfort analysis, missing middle column keys (t,g,y,h,b,n) are assigned the 
 - **Letter-Only Analysis**: Automatically filters to letters, ignoring punctuation
 - **Word Boundary Respect**: Spaces break bigram chains (prevents artificial cross-word bigrams)
 - **Empirical Weighting**: Uses combination-specific weights derived from real data
-- **Score Interpretation**: Higher scores = better layouts (consistent across both approaches)
+- **Score Interpretation**: Higher scores = better layouts (consistent across all modes)
 
-## Integration Example
+## Integration Examples
+
+### Basic Unweighted Usage
 ```python
 from dvorak9_scorer import Dvorak9Scorer
 
-# Compare speed vs. comfort scoring
+# Simple unweighted scoring
 layout_mapping = {'e': 'D', 't': 'K', 'a': 'A', 'o': 'S'}
 text = "the quick brown fox"
 
+scorer = Dvorak9Scorer(layout_mapping, text, weights_csv=None)
+results = scorer.calculate_scores()
+
+print(f"Unweighted score: {results['layout_score']:.3f}")
+print(f"Individual scores: {results['individual_scores']}")
+```
+
+### Comparing Scoring Modes
+```python
+from dvorak9_scorer import Dvorak9Scorer
+
+layout_mapping = {'e': 'D', 't': 'K', 'a': 'A', 'o': 'S'}
+text = "the quick brown fox"
+
+# Unweighted scoring
+unweighted_scorer = Dvorak9Scorer(layout_mapping, text, weights_csv=None)
+unweighted_results = unweighted_scorer.calculate_scores()
+
 # Speed-based scoring
-speed_scorer = Dvorak9Scorer(layout_mapping, text, "dvorak9_weights_speed.csv")
+speed_scorer = Dvorak9Scorer(layout_mapping, text, "combinations_weights_from_speed_significant.csv")
 speed_results = speed_scorer.calculate_scores()
 
 # Comfort-based scoring
 comfort_scorer = Dvorak9Scorer(layout_mapping, text, "combinations_weights_from_comfort_significant.csv")
 comfort_results = comfort_scorer.calculate_scores()
 
+print(f"Unweighted score: {unweighted_results['layout_score']:.3f}")
 print(f"Speed score: {speed_results['layout_score']:.3f}")
 print(f"Comfort score: {comfort_results['layout_score']:.3f}")
+```
+
+### Command Line Comparison
+```bash
+# Compare all three scoring modes for the same layout
+ITEMS="eta;oinshr"; POSITIONS="FDESGJWXRT"
+
+# Unweighted (pure theory)
+poetry run python3 dvorak9_scorer.py --items "$ITEMS" --positions "$POSITIONS" --no-weights --ten-scores
+
+# Speed-optimized (empirical)
+poetry run python3 dvorak9_scorer.py --items "$ITEMS" --positions "$POSITIONS" --weights-csv weights/combinations_weights_from_speed_significant.csv --ten-scores
+
+# Comfort-optimized (empirical)  
+poetry run python3 dvorak9_scorer.py --items "$ITEMS" --positions "$POSITIONS" --weights-csv weights/combinations_weights_from_comfort_significant.csv --ten-scores
 ```

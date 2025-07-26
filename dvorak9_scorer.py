@@ -16,40 +16,36 @@ The 9 scoring criteria for typing bigrams are (0-1, higher = better performance)
 8. Strum - favor inward rolls over outward rolls (same hand)
 9. Strong fingers - favor stronger fingers over weaker ones
 
-The combined layout score is calculated as the negative of the empirical weighted combination score,
-so that HIGHER scores indicate BETTER layouts (consistent with individual criteria).
+The combined layout score is calculated using empirical combination weights with proper
+sign handling: speed weights (negative correlation = faster) are flipped, comfort weights 
+(positive correlation = more comfortable) are kept as-is. Higher scores = better layouts.
 
-Requires a weights CSV file.
-  - NOTE: The empirical weights derived from 136M+ keystroke dataset analysis with FDR correction
-          tested 511 combinations, which should cover most real bigrams reasonably well.
-  - NOTE: The empirical weights derived from the comfort scores keystroke dataset analysis with FDR correction
-          tested 511 combinations, which should cover most real bigrams reasonably well.
+Requires a weights CSV file for weighted scoring, or use --no-weights for unweighted 0-1 scoring.
 
-# Basic scoring
-poetry run python3 dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./"  --weights-csv "weights/combinations_weights_from_speed_significant.csv"
-poetry run python3 dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./"  --weights-csv "weights/combinations_weights_from_comfort_significant.csv"
+# Weighted scoring with speed-based weights
+python dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./" --weights-csv "weights/combinations_weights_from_speed_significant.csv"
 
-python dvorak9_scorer.py --items "etaoinsrhldcumfp" --positions "FDESRJKUMIVLA;OW"
+# Weighted scoring with comfort-based weights
+python dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./" --weights-csv "weights/combinations_weights_from_comfort_significant.csv"
+
+# Unweighted scoring (0-1 individual criteria only)
+python dvorak9_scorer.py --items "etaoinsrhldcumfp" --positions "FDESRJKUMIVLA;OW" --no-weights
 
 # With detailed breakdown
-python dvorak9_scorer.py --items "abc" --positions "FDJ" --details
+python dvorak9_scorer.py --items "abc" --positions "FDJ" --details --no-weights
 
 # CSV export for analysis
-python dvorak9_scorer.py --items "abc" --positions "FDJ" --csv > results.csv
+python dvorak9_scorer.py --items "abc" --positions "FDJ" --csv --no-weights
 
-# Use items as text if no text provided
-python dvorak9_scorer.py --items "abc" --positions "FDJ" --text "abacaba"
-python dvorak9_scorer.py --items "abc" --positions "FDJ" --text-file "sample_text.txt"
-
-# Return just the 10 scores (average weighted + 9 individual scores)
-python dvorak9_scorer.py --items "abc" --positions "FDJ" --ten-scores
+# Return just the 10 scores (average + 9 individual scores)
+python dvorak9_scorer.py --items "abc" --positions "FDJ" --ten-scores --no-weights
 
 """
 
 import argparse
 import re
 from collections import defaultdict
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple, Set, Optional
 
 # QWERTY keyboard layout with (row, finger, hand) mapping
 # Rows: 0=number, 1=top, 2=home, 3=bottom
@@ -103,7 +99,7 @@ FINGER_COLUMNS = {
     }
 }
 
-def get_key_info(key: str) -> Tuple[int, int, str]:
+def get_key_info(key: str) -> Optional[Tuple[int, int, str]]:
     """Get (row, finger, hand) for a key."""
     key = key.upper()
     if key in QWERTY_LAYOUT:
@@ -138,8 +134,15 @@ def score_bigram_dvorak9(bigram: str) -> Dict[str, float]:
     char1, char2 = bigram[0].upper(), bigram[1].upper()
     
     # Get key information
-    row1, finger1, hand1 = get_key_info(char1)
-    row2, finger2, hand2 = get_key_info(char2)
+    key_info1 = get_key_info(char1)
+    key_info2 = get_key_info(char2)
+    
+    if key_info1 is None or key_info2 is None:
+        return {criterion: 0.5 for criterion in ['hands', 'fingers', 'skip_fingers', 'dont_cross_home', 
+                                                'same_row', 'home_row', 'columns', 'strum', 'strong_fingers']}
+    
+    row1, finger1, hand1 = key_info1
+    row2, finger2, hand2 = key_info2
     
     scores = {}
     
@@ -223,27 +226,31 @@ def score_bigram_dvorak9(bigram: str) -> Dict[str, float]:
     
     return scores
 
-def load_combination_weights(csv_path: str = "weights/combinations_weights_from_speed_significant.csv"):
+def load_combination_weights(csv_path: Optional[str] = None) -> Optional[Dict[Tuple[str, ...], float]]:
     """
     Load empirical correlation weights for different feature combinations from CSV file.
     
     Args:
-        csv_path: Path to CSV file containing combination correlations
+        csv_path: Path to CSV file containing combination correlations (optional)
         
     Returns:
-        Dict mapping combination tuples to correlation values
+        Dict mapping combination tuples to correlation values, or None if no file provided
         
     The CSV should have 'combination' and 'correlation' columns.
     These correlations are derived from analysis of 136M+ keystroke dataset
     with FDR correction applied to 529 statistical tests.
     """
+    if csv_path is None:
+        print("No weights file provided - using unweighted scoring")
+        return None
+        
     import csv
     import os
     
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"Combination weights file not found: {csv_path}")
     
-    combination_weights = {}
+    combination_weights: Dict[Tuple[str, ...], float] = {}
     
     try:
         with open(csv_path, 'r', encoding='utf-8') as f:
@@ -289,7 +296,7 @@ def load_combination_weights(csv_path: str = "weights/combinations_weights_from_
     
     return combination_weights
 
-def identify_bigram_combination(bigram_scores, threshold=0):
+def identify_bigram_combination(bigram_scores: Dict[str, float], threshold: float = 0) -> Tuple[str, ...]:
     """
     Identify which feature combination a bigram exhibits.
     
@@ -308,7 +315,8 @@ def identify_bigram_combination(bigram_scores, threshold=0):
     
     return tuple(sorted(active_features))
 
-def score_bigram_weighted(bigram_scores, combination_weights):
+def score_bigram_weighted(bigram_scores: Dict[str, float], 
+                         combination_weights: Dict[Tuple[str, ...], float]) -> float:
     """
     Score a single bigram using empirical combination-specific weights.
     
@@ -353,25 +361,64 @@ def score_bigram_weighted(bigram_scores, combination_weights):
 
 class Dvorak9Scorer:
     """
-    Dvorak-9 scorer using empirical combination weighting.
+    Dvorak-9 scorer using empirical combination weighting or unweighted scoring.
     
     Implements the 9 evaluation criteria derived from Dvorak's work with
-    empirical weights derived from analysis of real typing performance data.
+    optional empirical weights derived from analysis of real typing performance data.
     """
     
-    def __init__(self, layout_mapping: Dict[str, str], text: str, weights_csv: str = "weights/combinations_weights_from_speed_significant.csv"):
+    def __init__(self, layout_mapping: Dict[str, str], text: str, weights_csv: Optional[str] = None):
         """
         Initialize scorer with layout mapping and text.
         
         Args:
             layout_mapping: Dict mapping characters to QWERTY positions (e.g., {'a': 'F', 'b': 'D'})
             text: Text to analyze for bigram scoring
-            weights_csv: Path to CSV file containing empirical combination weights
+            weights_csv: Path to CSV file containing empirical combination weights (optional)
         """
         self.layout_mapping = layout_mapping
         self.text = text.lower()
         self.bigrams = self._extract_bigrams()
-        self.combination_weights = load_combination_weights(weights_csv)
+        
+        # Load weights if provided, otherwise use None for unweighted scoring
+        if weights_csv:
+            self.combination_weights = load_combination_weights(weights_csv)
+            # Determine weights type based on filename for proper sign handling
+            self.weights_type = self._determine_weights_type(weights_csv)
+        else:
+            self.combination_weights = None
+            self.weights_type = None
+
+    def _determine_weights_type(self, weights_csv: str) -> str:
+        """Determine if weights are speed-based or comfort-based from filename."""
+        filename = weights_csv.lower()
+        if 'speed' in filename:
+            return 'speed'
+        elif 'comfort' in filename:
+            return 'comfort'
+        else:
+            # Try to determine from the actual correlations in the file
+            import csv
+            try:
+                with open(weights_csv, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    correlations = []
+                    for row in reader:
+                        try:
+                            corr = float(row.get('correlation', '0'))
+                            correlations.append(corr)
+                        except ValueError:
+                            continue
+                    
+                    if correlations:
+                        avg_corr = sum(correlations) / len(correlations)
+                        # If most correlations are negative, assume speed weights
+                        return 'speed' if avg_corr < 0 else 'comfort'
+            except:
+                pass
+            
+            # Default fallback
+            return 'speed'
 
     def _extract_bigrams(self) -> List[Tuple[str, str]]:
         """Extract all consecutive character pairs from text that exist in layout mapping.
@@ -381,7 +428,6 @@ class Dvorak9Scorer:
         bigrams = []
         
         # Split text into words first (respecting boundaries)
-        import re
         words = re.findall(r'\S+', self.text)  # Split on whitespace
         
         for word in words:
@@ -404,51 +450,82 @@ class Dvorak9Scorer:
         # Use the canonical scoring function
         return score_bigram_dvorak9(pos1 + pos2)
 
-    def calculate_scores(self):
-        """Calculate layout score using empirical combination weighting."""
+    def calculate_scores(self) -> Dict:
+        """Calculate layout score using empirical combination weighting or unweighted scoring."""
         if not self.bigrams:
             return {
-                'layout_score': 0.0,  # 0 is neutral for higher = better
+                'layout_score': 0.0,
                 'average_weighted_score': 0.0,
                 'total_weighted_score': 0.0,
                 'bigram_count': 0,
                 'individual_scores': {},
                 'combination_breakdown': {},
-                'bigram_details': []
+                'bigram_details': [],
+                'scoring_mode': 'unweighted' if self.combination_weights is None else 'weighted'
             }
-        
-        total_weighted_score = 0.0
-        combination_counts = defaultdict(int)
-        combination_score_sums = defaultdict(float)
-        bigram_details = []
         
         # Initialize accumulators for individual unweighted scores
         criterion_sums = defaultdict(float)
         criterion_counts = defaultdict(int)
+        bigram_details = []
         
-        # Score each bigram with combination weighting
+        # If we have weights, also track weighted scoring
+        if self.combination_weights is not None:
+            total_weighted_score = 0.0
+            combination_counts = defaultdict(int)
+            combination_score_sums = defaultdict(float)
+        
+        # Score each bigram
         for char1, char2 in self.bigrams:
             bigram_scores = self.score_bigram(char1, char2)
-            weighted_score = score_bigram_weighted(bigram_scores, self.combination_weights)
-            combination = identify_bigram_combination(bigram_scores)
             
-            total_weighted_score += -weighted_score  # FLIP SIGN
-            combination_counts[combination] += 1
-            combination_score_sums[combination] += -weighted_score  # FLIP SIGN
-            
-            # Accumulate individual criterion scores (unweighted)
+            # Always calculate individual criterion scores (unweighted)
             for criterion, score in bigram_scores.items():
                 criterion_sums[criterion] += score
                 criterion_counts[criterion] += 1
             
-            bigram_details.append({
+            # Calculate weighted score if weights available
+            bigram_detail = {
                 'bigram': f"{char1}{char2}",
-                'scores': bigram_scores,
-                'combination': combination,
-                'weighted_score': -weighted_score  # FLIP SIGN
-            })
+                'scores': bigram_scores
+            }
+            
+            if self.combination_weights is not None:
+                weighted_score = score_bigram_weighted(bigram_scores, self.combination_weights)
+                combination = identify_bigram_combination(bigram_scores)
+                
+                # Apply correct sign based on weights type
+                # CRITICAL: Different weights types require different sign handling
+                if self.weights_type == 'speed':
+                    # Speed weights: negative correlation = good (faster typing)
+                    # Example: correlation = -0.14 means higher Dvorak score → faster typing
+                    # Flip sign so negative becomes positive contribution to layout score
+                    final_score = -weighted_score
+                else:  # comfort weights
+                    # Comfort weights: positive correlation = good (more comfortable) 
+                    # Example: correlation = +0.44 means higher Dvorak score → more comfortable
+                    # Keep original sign so positive stays positive contribution
+                    final_score = weighted_score
+                
+                total_weighted_score += final_score
+                combination_counts[combination] += 1
+                combination_score_sums[combination] += final_score
+                
+                bigram_detail.update({
+                    'combination': combination,
+                    'weighted_score': final_score
+                })
+            else:
+                # For unweighted, use sum of individual scores
+                unweighted_sum = sum(bigram_scores.values())
+                bigram_detail.update({
+                    'combination': tuple(sorted(bigram_scores.keys())),  # All criteria
+                    'weighted_score': unweighted_sum
+                })
+            
+            bigram_details.append(bigram_detail)
         
-        # Calculate mean individual scores (unweighted, 0-1 scale)
+        # Calculate mean individual scores (always available)
         individual_scores = {}
         for criterion in ['hands', 'fingers', 'skip_fingers', 'dont_cross_home', 
                          'same_row', 'home_row', 'columns', 'strum', 'strong_fingers']:
@@ -457,35 +534,97 @@ class Dvorak9Scorer:
             else:
                 individual_scores[criterion] = 0.0
         
-        # Calculate combination breakdown
-        combination_breakdown = {}
-        for combo, count in combination_counts.items():
-            combination_breakdown[combo] = {
-                'count': count,
-                'total_contribution': combination_score_sums[combo],  # Already flipped above
-                'average_score': combination_score_sums[combo] / count if count > 0 else 0,  # Already flipped
-                'percentage': count / len(self.bigrams) * 100
+        # Prepare results based on whether we have weights
+        if self.combination_weights is not None:
+            # Weighted scoring results
+            average_weighted_score = total_weighted_score / len(self.bigrams)
+            
+            combination_breakdown = {}
+            for combo, count in combination_counts.items():
+                combination_breakdown[combo] = {
+                    'count': count,
+                    'total_contribution': combination_score_sums[combo],
+                    'average_score': combination_score_sums[combo] / count if count > 0 else 0,
+                    'percentage': count / len(self.bigrams) * 100
+                }
+
+            return {
+                'layout_score': average_weighted_score,  # Primary metric
+                'average_weighted_score': average_weighted_score,
+                'total_weighted_score': total_weighted_score,
+                'bigram_count': len(self.bigrams),
+                'individual_scores': individual_scores,
+                'combination_breakdown': combination_breakdown,
+                'bigram_details': bigram_details,
+                'scoring_mode': 'weighted',
+                'weights_type': self.weights_type
+            }
+        else:
+            # Unweighted scoring results - use average of individual scores
+            average_individual_score = sum(individual_scores.values()) / len(individual_scores)
+            total_individual_score = average_individual_score * len(self.bigrams)
+            
+            return {
+                'layout_score': average_individual_score,
+                'average_weighted_score': average_individual_score,
+                'total_weighted_score': total_individual_score,
+                'bigram_count': len(self.bigrams),
+                'individual_scores': individual_scores,
+                'combination_breakdown': {},  # No combinations in unweighted mode
+                'bigram_details': bigram_details,
+                'scoring_mode': 'unweighted'
             }
 
-        # Calculate average weighted score (the main metric)
-        average_weighted_score = total_weighted_score / len(self.bigrams)
+    def calculate_theoretical_maximum(self) -> float:
+        """Calculate theoretical maximum possible score for current weights type."""
+        print(f"Debug: calculate_theoretical_maximum called")
+        print(f"Debug: combination_weights is None: {self.combination_weights is None}")
+        
+        if self.combination_weights is None:
+            print(f"Debug: returning 1.0 for unweighted")
+            return 1.0  # Unweighted maximum is 1.0 (average of all 1.0 scores)
+        
+        print(f"Debug: weights_type = {self.weights_type}")
+        print(f"Debug: number of combinations = {len(self.combination_weights)}")
+        
+        # For weighted scoring, find the highest magnitude correlation
+        max_magnitude = 0.0
+        combinations_found = 0
+        
+        for combination, weight in self.combination_weights.items():
+            if combination:  # Skip empty combination
+                combinations_found += 1
+                # Calculate what this combination would contribute with perfect scores
+                weighted_score = weight * 1.0  # All criteria in combination = 1.0
+                
+                # Apply same sign logic as actual scoring
+                if self.weights_type == 'speed':
+                    final_score = -weighted_score  # Speed: negative correlation = good, so flip
+                else:  # comfort
+                    final_score = weighted_score   # Comfort: positive correlation = good, so keep
+                
+                # Track the highest positive contribution possible
+                if final_score > max_magnitude:
+                    max_magnitude = final_score
+                    
+                # Debug: show first few combinations
+                if combinations_found <= 3:
+                    combo_str = '+'.join(combination)
+                    print(f"Debug: {combo_str} weight={weight:.6f} final={final_score:.6f}")
+        
+        print(f"Debug: Found {combinations_found} combinations, max_magnitude={max_magnitude:.6f}")
+        
+        # Return the theoretical maximum
+        result = max_magnitude if max_magnitude > 0 else 1.0
+        print(f"Debug: returning {result:.6f}")
+        return result
 
-        return {
-            'layout_score': average_weighted_score,  # Primary metric
-            'average_weighted_score': average_weighted_score,
-            'total_weighted_score': total_weighted_score,
-            'bigram_count': len(self.bigrams),
-            'individual_scores': individual_scores,
-            'combination_breakdown': combination_breakdown,
-            'bigram_details': bigram_details
-        }
-
-    def get_detailed_breakdown(self) -> Dict:
-        """Get detailed breakdown by criterion showing good/bad examples."""
+    def get_detailed_breakdown(self) -> Dict[str, List[Dict]]:
+        """Get detailed breakdown by criterion showing all bigrams with scores."""
         if not self.bigrams:
             return {}
         
-        breakdown = defaultdict(lambda: {'good': [], 'bad': [], 'neutral': []})
+        breakdown = defaultdict(list)
         
         for char1, char2 in self.bigrams:
             bigram_scores = self.score_bigram(char1, char2)
@@ -493,27 +632,73 @@ class Dvorak9Scorer:
             pos2 = self.layout_mapping.get(char2, char2.upper())
             
             for criterion, score in bigram_scores.items():
-                example = f"{char1}{char2} ({pos1}{pos2})"
-                
-                if score >= 0.8:
-                    breakdown[criterion]['good'].append(example)
-                elif score <= 0.2:
-                    breakdown[criterion]['bad'].append(example)
-                else:
-                    breakdown[criterion]['neutral'].append(example)
+                breakdown[criterion].append({
+                    'bigram': f"{char1}{char2}",
+                    'positions': f"{pos1}{pos2}", 
+                    'score': score
+                })
+        
+        # Sort each criterion's bigrams by score (descending)
+        for criterion in breakdown:
+            breakdown[criterion].sort(key=lambda x: x['score'], reverse=True)
+        
+        return dict(breakdown)
+        """Get detailed breakdown by criterion showing all bigrams with scores."""
+        if not self.bigrams:
+            return {}
+        
+        breakdown = defaultdict(list)
+        
+        for char1, char2 in self.bigrams:
+            bigram_scores = self.score_bigram(char1, char2)
+            pos1 = self.layout_mapping.get(char1, char1.upper())
+            pos2 = self.layout_mapping.get(char2, char2.upper())
+            
+            for criterion, score in bigram_scores.items():
+                breakdown[criterion].append({
+                    'bigram': f"{char1}{char2}",
+                    'positions': f"{pos1}{pos2}", 
+                    'score': score
+                })
+        
+        # Sort each criterion's bigrams by score (descending)
+        for criterion in breakdown:
+            breakdown[criterion].sort(key=lambda x: x['score'], reverse=True)
         
         return dict(breakdown)
 
-def print_combination_results(results):
-    """Print formatted results from empirical combination scoring."""
-    print("Dvorak-9 Empirical Combination Scoring Results")
+def print_combination_results(results: Dict) -> None:
+    """Print formatted results from scoring."""
+    scoring_mode = results.get('scoring_mode', 'unknown')
+    weights_type = results.get('weights_type', '')
+    
+    if scoring_mode == 'weighted':
+        weights_desc = f" ({weights_type}-based)" if weights_type else ""
+        print(f"Dvorak-9 Empirical Combination Scoring Results{weights_desc}")
+    else:
+        print("Dvorak-9 Unweighted Individual Criteria Results")
+    
     print("=" * 70)
     
-    # Primary metric - empirically validated
-    print(f"Empirical Score: {results['average_weighted_score']:8.3f}")
-    print(f"Bigrams Analyzed: {results['bigram_count']:8d}")
+    # Primary metric
+    print(f"Layout Score: {results['layout_score']:8.3f}")
     
-    # Secondary metrics - individual criteria for interpretability 
+    # Show normalized score for comparison
+    normalized = results.get('normalized_score', results['layout_score'])
+    theoretical_max = results.get('theoretical_maximum', 1.0)
+    print(f"Normalized Score: {normalized:8.3f} (out of 1.0)")
+    print(f"Theoretical Maximum: {theoretical_max:8.3f}")
+    
+    if scoring_mode == 'weighted':
+        print(f"Average Weighted Score: {results['average_weighted_score']:8.3f}")
+        if weights_type:
+            print(f"Weights Type: {weights_type}")
+    else:
+        print(f"Average Individual Score: {results['average_weighted_score']:8.3f}")
+    print(f"Bigrams Analyzed: {results['bigram_count']:8d}")
+    print(f"Scoring Mode: {scoring_mode}")
+    
+    # Individual criteria breakdown
     print(f"\nIndividual Criterion Breakdown (0-1 scale, higher = better):")
     print("-" * 60)
     
@@ -534,54 +719,54 @@ def print_combination_results(results):
         score = individual_scores.get(key, 0.0)
         print(f"  {name:<25}: {score:6.3f}")
     
-    # Detailed breakdown - combination contributions
-    print(f"\nCombination Breakdown:")
-    print("-" * 70)
-    print(f"{'Combination':<35} {'Count':<8} {'Contrib':<10} {'Avg':<8} {'%':<6}")
-    print("-" * 70)
-    
-    # Sort by total contribution magnitude
-    sorted_combos = sorted(results['combination_breakdown'].items(), 
-                          key=lambda x: abs(x[1]['total_contribution']), 
-                          reverse=True)
-    
-    for combo, stats in sorted_combos[:15]:  # Top 15 combinations
-        combo_str = '+'.join(combo) if combo else 'none'
-        if len(combo_str) > 34:
-            combo_str = combo_str[:31] + '...'
+    # Combination breakdown (only for weighted scoring)
+    if scoring_mode == 'weighted' and results.get('combination_breakdown'):
+        print(f"\nCombination Breakdown:")
+        print("-" * 70)
+        print(f"{'Combination':<35} {'Count':<8} {'Contrib':<10} {'Avg':<8} {'%':<6}")
+        print("-" * 70)
         
-        print(f"{combo_str:<35} {stats['count']:<8} {stats['total_contribution']:<10.3f} "
-              f"{stats['average_score']:<8.3f} {stats['percentage']:<6.1f}")
+        # Sort by total contribution magnitude
+        sorted_combos = sorted(results['combination_breakdown'].items(), 
+                              key=lambda x: abs(x[1]['total_contribution']), 
+                              reverse=True)
+        
+        for combo, stats in sorted_combos[:15]:  # Top 15 combinations
+            combo_str = '+'.join(combo) if combo else 'none'
+            if len(combo_str) > 34:
+                combo_str = combo_str[:31] + '...'
+            
+            print(f"{combo_str:<35} {stats['count']:<8} {stats['total_contribution']:<10.3f} "
+                  f"{stats['average_score']:<8.3f} {stats['percentage']:<6.1f}")
 
-def main():
+def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Calculate Dvorak-9 layout scores using empirical combination weighting.",
+        description="Calculate Dvorak-9 layout scores using empirical combination weighting or unweighted individual criteria.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
 
-  # Basic scoring
-  python dvorak9_scorer.py --items "abc" --positions "FDJ" --text "abacaba"
-  
-  # Score layout with details  
-  python dvorak9_scorer.py --items "etaoinsrhldcumfp" --positions "FDESRJKUMIVLA;OW" --details
-  
-  # Use items as text if no text provided
-  python dvorak9_scorer.py --items "abc" --positions "FDJ"
-  
-  # Use custom weights file
+  # Weighted scoring with speed-based weights
   python dvorak9_scorer.py --items "abc" --positions "FDJ" --weights-csv "weights/combinations_weights_from_speed_significant.csv"
-
-  # QWERTY to QWERTY
-  poetry run python3 dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./"
-
+  
+  # Weighted scoring with comfort-based weights
+  python dvorak9_scorer.py --items "abc" --positions "FDJ" --weights-csv "weights/combinations_weights_from_comfort_significant.csv"
+  
+  # Unweighted scoring (0-1 individual criteria only)
+  python dvorak9_scorer.py --items "abc" --positions "FDJ" --no-weights
+  
+  # Score layout with details (unweighted)
+  python dvorak9_scorer.py --items "etaoinsrhldcumfp" --positions "FDESRJKUMIVLA;OW" --details --no-weights
+  
   # Use items as text if no text provided
-  python dvorak9_scorer.py --items "abc" --positions "FDJ" --text "abacaba"
-  python dvorak9_scorer.py --items "abc" --positions "FDJ" --text-file "sample_text.txt"
+  python dvorak9_scorer.py --items "abc" --positions "FDJ" --no-weights
+  
+  # Use text file
+  python dvorak9_scorer.py --items "abc" --positions "FDJ" --text-file "sample_text.txt" --no-weights
 
-  # Return just the 10 scores (total weighted + 9 individual scores)
-  python dvorak9_scorer.py --items "abc" --positions "FDJ" --ten-scores
+  # Return just the 10 scores (total + 9 individual scores)
+  python dvorak9_scorer.py --items "abc" --positions "FDJ" --ten-scores --no-weights
   
 """
     )
@@ -596,12 +781,16 @@ Examples:
                        help="Path to text file to analyze (alternative to --text)")
     parser.add_argument("--weights-csv", default="weights/combinations_weights_from_speed_significant.csv",
                        help="Path to CSV file containing empirical combination weights")
+    parser.add_argument("--no-weights", action="store_true",
+                       help="Use unweighted scoring (individual 0-1 criteria only)")
     parser.add_argument("--details", action="store_true",
                        help="Show detailed breakdown with examples")
     parser.add_argument("--csv", action="store_true",
                        help="Output in CSV format")
     parser.add_argument("--ten-scores", action="store_true",
-                       help="Output only 10 scores: total weighted score followed by 9 individual scores")
+                       help="Output only 10 scores: normalized score followed by 9 individual scores")
+    parser.add_argument("--compare", action="store_true",
+                       help="Show comparison table with normalized scores for better comparison")
 
     args = parser.parse_args()
     
@@ -640,16 +829,22 @@ Examples:
         else:
             text = args.items
 
+        # Determine weights file
+        if args.no_weights:
+            weights_csv = None
+        else:
+            weights_csv = args.weights_csv
+
         # Calculate scores
-        scorer = Dvorak9Scorer(layout_mapping, text, args.weights_csv)
+        scorer = Dvorak9Scorer(layout_mapping, text, weights_csv)
         results = scorer.calculate_scores()
 
         if args.ten_scores:
-            # Output 10 scores: average weighted score + 9 individual scores
+            # Output 10 scores: layout score + 9 individual scores
             individual_scores = results.get('individual_scores', {})
             
-            # Use average_weighted_score
-            scores = [results['average_weighted_score']]
+            # Use normalized_score as the primary score for comparability
+            scores = [results.get('normalized_score', results['layout_score'])]
             
             # Add individual scores in consistent order
             for criterion in ['hands', 'fingers', 'skip_fingers', 'dont_cross_home', 
@@ -662,10 +857,17 @@ Examples:
             # CSV output
             print("metric,value")
             
-            # Use average as the main empirical score
-            print(f"empirical_score,{results['average_weighted_score']:.6f}")            
-            print(f"average_empirical_score,{results['average_weighted_score']:.6f}")
-            print(f"total_empirical_score,{results['total_weighted_score']:.6f}")
+            # Primary score
+            scoring_mode = results.get('scoring_mode', 'unknown')
+            weights_type = results.get('weights_type', '')
+            print(f"layout_score,{results['layout_score']:.6f}")
+            print(f"normalized_score,{results.get('normalized_score', results['layout_score']):.6f}")
+            print(f"theoretical_maximum,{results.get('theoretical_maximum', 1.0):.6f}")
+            print(f"scoring_mode,{scoring_mode}")
+            if weights_type:
+                print(f"weights_type,{weights_type}")
+            print(f"average_score,{results['average_weighted_score']:.6f}")
+            print(f"total_score,{results['total_weighted_score']:.6f}")
             print(f"bigram_count,{results['bigram_count']}")
             
             # Individual unweighted scores
@@ -675,14 +877,15 @@ Examples:
                 score = individual_scores.get(criterion, 0.0)
                 print(f"individual_{criterion},{score:.6f}")
             
-            # Top combinations
-            sorted_combos = sorted(results['combination_breakdown'].items(), 
-                                  key=lambda x: abs(x[1]['total_contribution']), 
-                                  reverse=True)
-            for i, (combo, stats) in enumerate(sorted_combos[:5]):
-                combo_str = '+'.join(combo) if combo else 'none'
-                print(f"top_combo_{i+1},{combo_str}")
-                print(f"top_combo_{i+1}_contribution,{stats['total_contribution']:.6f}")
+            # Top combinations (only for weighted scoring)
+            if scoring_mode == 'weighted' and results.get('combination_breakdown'):
+                sorted_combos = sorted(results['combination_breakdown'].items(), 
+                                      key=lambda x: abs(x[1]['total_contribution']), 
+                                      reverse=True)
+                for i, (combo, stats) in enumerate(sorted_combos[:5]):
+                    combo_str = '+'.join(combo) if combo else 'none'
+                    print(f"top_combo_{i+1},{combo_str}")
+                    print(f"top_combo_{i+1}_contribution,{stats['total_contribution']:.6f}")
                 
         else:
             # Human-readable output
@@ -711,14 +914,19 @@ Examples:
                 
                 for key, name in criteria_info:
                     if key in breakdown:
-                        b = breakdown[key]
+                        bigram_data = breakdown[key]
                         print(f"\n{name}:")
-                        print(f"  Good examples (≥0.8): {', '.join(b['good'][:10])}")
-                        if len(b['good']) > 10:
-                            print(f"    ... and {len(b['good'])-10} more")
-                        print(f"  Bad examples (≤0.2): {', '.join(b['bad'][:10])}")
-                        if len(b['bad']) > 10:
-                            print(f"    ... and {len(b['bad'])-10} more")
+                        
+                        # Show all bigrams with scores, sorted by score (highest first)
+                        for item in bigram_data:
+                            print(f"  {item['positions']}: {item['score']:.1f}", end="")
+                            if len(bigram_data) <= 10:  # Show bigram letters if not too many
+                                print(f" ({item['bigram']})")
+                            else:
+                                print()
+                        
+                        if len(bigram_data) == 0:
+                            print("  (no bigrams found)")
         
     except Exception as e:
         print(f"Error: {e}")
@@ -733,21 +941,23 @@ if __name__ == "__main__":
         main()
     else:
         # Example usage when imported/run without args
-        print("Dvorak-9 Empirical Combination Scoring Example")
+        print("Dvorak-9 Scoring Example")
         print("="*50)
         
         layout_mapping = {'a': 'F', 'b': 'D', 'c': 'J'}
         text = "abacaba"
         
         try:
-            scorer = Dvorak9Scorer(layout_mapping, text)
+            # Try weighted scoring first
+            scorer = Dvorak9Scorer(layout_mapping, text, "weights/combinations_weights_from_speed_significant.csv")
+            results = scorer.calculate_scores()
+            print("Weighted scoring:")
+            print_combination_results(results)
+        except FileNotFoundError:
+            print("Weights file not found, using unweighted scoring:")
+            # Fall back to unweighted scoring
+            scorer = Dvorak9Scorer(layout_mapping, text, weights_csv=None)
             results = scorer.calculate_scores()
             print_combination_results(results)
-        except FileNotFoundError as e:
-            print(f"Error: {e}")
-            print("Please ensure weights file is in the weights directory.")
-            print("This file should contain the empirical combination weights.")
         except Exception as e:
             print(f"Error: {e}")
-            import traceback
-            traceback.print_exc()
