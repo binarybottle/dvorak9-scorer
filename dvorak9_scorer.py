@@ -28,16 +28,16 @@ python dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "Q
 # Weighted scoring with comfort-based weights
 python dvorak9_scorer.py --items "qwertyuiopasdfghjkl;zxcvbnm,./" --positions "QWERTYUIOPASDFGHJKL;ZXCVBNM,./" --weights-csv "weights/combinations_weights_from_comfort_significant.csv"
 
-# Unweighted scoring (0-1 individual criteria only) - FIXED CHARACTER COUNT
+# Unweighted scoring (0-1 individual criteria only)
 python dvorak9_scorer.py --items "etaoinshr" --positions "FDEGJWXRT" --no-weights
 
-# With detailed breakdown - FIXED CHARACTER COUNT
+# With detailed breakdown
 python dvorak9_scorer.py --items "etaoinshr" --positions "FDEGJWXRT" --details --no-weights
 
-# CSV export for analysis - FIXED CHARACTER COUNT
+# CSV export for analysis
 python dvorak9_scorer.py --items "etaoinshr" --positions "FDEGJWXRT" --csv --no-weights
 
-# Return just the 10 scores (average + 9 individual scores) - FIXED CHARACTER COUNT
+# Return just the 10 scores (average + 9 individual scores)
 python dvorak9_scorer.py --items "etaoinshr" --positions "FDEGJWXRT" --ten-scores --no-weights
 
 """
@@ -541,10 +541,8 @@ class Dvorak9Scorer:
             # Weighted scoring results
             average_weighted_score = total_weighted_score / len(self.bigrams)
             
-            # Calculate theoretical maximum and FIXED normalized score
+            # Calculate theoretical maximum and normalized score
             theoretical_max = self.calculate_theoretical_maximum()
-            
-            # FIXED NORMALIZATION: Proper 0-1 clamping while preserving negative score meaning
             if theoretical_max > 0:
                 raw_ratio = average_weighted_score / theoretical_max
                 normalized_score = max(0.0, min(1.0, raw_ratio))

@@ -231,11 +231,11 @@ print(f"Comfort score: {comfort_results['layout_score']:.3f}")
 ITEMS="etaoinshrlcu"; POSITIONS="FDESGJWXRTYZ"
 
 # Unweighted (pure theory)
-poetry run python3 dvorak9_scorer.py --items "$ITEMS" --positions "$POSITIONS" --no-weights --ten-scores
+python dvorak9_scorer.py --items "$ITEMS" --positions "$POSITIONS" --no-weights --ten-scores
 
 # Speed-optimized (empirical)
-poetry run python3 dvorak9_scorer.py --items "$ITEMS" --positions "$POSITIONS" --weights-csv weights/combinations_weights_from_speed_significant.csv --ten-scores
+python dvorak9_scorer.py --items "$ITEMS" --positions "$POSITIONS" --weights-csv weights/combinations_weights_from_speed_significant.csv --ten-scores
 
 # Comfort-optimized (empirical)  
-poetry run python3 dvorak9_scorer.py --items "$ITEMS" --positions "$POSITIONS" --weights-csv weights/combinations_weights_from_comfort_significant.csv --ten-scores
+python dvorak9_scorer.py --items "$ITEMS" --positions "$POSITIONS" --weights-csv weights/combinations_weights_from_comfort_significant.csv --ten-scores
 ```
