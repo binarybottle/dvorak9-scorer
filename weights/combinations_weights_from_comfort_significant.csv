@@ -1,0 +1,456 @@
+combination,k_way,correlation,p_value,abs_correlation,supports_dvorak,p_fdr_corrected,significant_after_fdr
+dont_cross_home + home_row + columns + strong_fingers,4,0.441770571,9.92E-24,0.441770571,TRUE,2.67E-21,TRUE
+dont_cross_home + columns + strong_fingers,3,0.441563443,1.05E-23,0.441563443,TRUE,2.67E-21,TRUE
+dont_cross_home + same_row + home_row + columns + strong_fingers,5,0.438158946,2.50E-23,0.438158946,TRUE,4.26E-21,TRUE
+dont_cross_home + same_row + home_row + columns + strum + strong_fingers,6,0.424540698,7.39E-22,0.424540698,TRUE,9.44E-20,TRUE
+dont_cross_home + columns,2,0.422808952,1.12E-21,0.422808952,TRUE,1.15E-19,TRUE
+fingers + dont_cross_home + same_row + home_row + columns + strong_fingers,6,0.405270264,6.90E-20,0.405270264,TRUE,5.88E-18,TRUE
+dont_cross_home + same_row + columns + strong_fingers,4,0.400713107,1.94E-19,0.400713107,TRUE,1.41E-17,TRUE
+skip_fingers + dont_cross_home + same_row + home_row + columns + strong_fingers,6,0.391335842,1.54E-18,0.391335842,TRUE,9.81E-17,TRUE
+fingers + dont_cross_home + home_row + columns + strong_fingers,5,0.390175729,1.97E-18,0.390175729,TRUE,1.12E-16,TRUE
+dont_cross_home + home_row + columns + strum + strong_fingers,5,0.389412452,2.33E-18,0.389412452,TRUE,1.19E-16,TRUE
+dont_cross_home + home_row + columns,3,0.384385426,6.83E-18,0.384385426,TRUE,3.17E-16,TRUE
+dont_cross_home + same_row + home_row + columns,4,0.383656954,7.97E-18,0.383656954,TRUE,3.33E-16,TRUE
+dont_cross_home + same_row + home_row + columns + strum,5,0.383365851,8.48E-18,0.383365851,TRUE,3.33E-16,TRUE
+dont_cross_home + same_row + home_row + strong_fingers,4,0.376834863,3.32E-17,0.376834863,TRUE,1.21E-15,TRUE
+same_row + home_row + columns + strong_fingers,4,0.37289808,7.46E-17,0.37289808,TRUE,2.47E-15,TRUE
+same_row + home_row + columns + strum + strong_fingers,5,0.372723054,7.73E-17,0.372723054,TRUE,2.47E-15,TRUE
+dont_cross_home + same_row + columns + strum + strong_fingers,5,0.372346811,8.35E-17,0.372346811,TRUE,2.51E-15,TRUE
+dont_cross_home,1,0.369403028,1.52E-16,0.369403028,TRUE,4.30E-15,TRUE
+dont_cross_home + same_row + columns,3,0.365747449,3.15E-16,0.365747449,TRUE,8.48E-15,TRUE
+fingers + dont_cross_home + same_row + columns + strong_fingers,5,0.36453395,4.01E-16,0.36453395,TRUE,1.02E-14,TRUE
+same_row + home_row + strong_fingers,3,0.361368933,7.48E-16,0.361368933,TRUE,1.82E-14,TRUE
+fingers + dont_cross_home + same_row + home_row + columns + strum + strong_fingers,7,0.361000698,8.04E-16,0.361000698,TRUE,1.87E-14,TRUE
+fingers + dont_cross_home + same_row + home_row + columns,5,0.359688053,1.04E-15,0.359688053,TRUE,2.31E-14,TRUE
+fingers + dont_cross_home + columns + strong_fingers,4,0.358437755,1.33E-15,0.358437755,TRUE,2.82E-14,TRUE
+skip_fingers + dont_cross_home + home_row + columns + strong_fingers,5,0.353247904,3.59E-15,0.353247904,TRUE,7.34E-14,TRUE
+hands + dont_cross_home + same_row + home_row + columns + strong_fingers,6,0.352132056,4.44E-15,0.352132056,TRUE,8.73E-14,TRUE
+skip_fingers + same_row + home_row + columns + strong_fingers,5,0.351251647,5.25E-15,0.351251647,TRUE,9.93E-14,TRUE
+dont_cross_home + home_row + columns + strum,4,0.348906851,8.16E-15,0.348906851,TRUE,1.49E-13,TRUE
+dont_cross_home + same_row + columns + strum,4,0.346951371,1.18E-14,0.346951371,TRUE,2.07E-13,TRUE
+dont_cross_home + home_row + strong_fingers,3,0.34408469,2.00E-14,0.34408469,TRUE,3.41E-13,TRUE
+dont_cross_home + same_row + home_row + strum + strong_fingers,5,0.343559512,2.20E-14,0.343559512,TRUE,3.63E-13,TRUE
+skip_fingers + dont_cross_home + same_row + home_row + columns,5,0.342653588,2.60E-14,0.342653588,TRUE,4.15E-13,TRUE
+dont_cross_home + columns + strum + strong_fingers,4,0.339987485,4.23E-14,0.339987485,TRUE,6.55E-13,TRUE
+fingers + same_row + home_row + columns + strong_fingers,5,0.336824391,7.49E-14,0.336824391,TRUE,1.13E-12,TRUE
+dont_cross_home + same_row + home_row,3,0.336330807,8.18E-14,0.336330807,TRUE,1.19E-12,TRUE
+fingers + dont_cross_home + same_row + home_row + strong_fingers,5,0.335798556,9.00E-14,0.335798556,TRUE,1.26E-12,TRUE
+skip_fingers + dont_cross_home + same_row + columns + strong_fingers,5,0.33571182,9.14E-14,0.33571182,TRUE,1.26E-12,TRUE
+dont_cross_home + same_row + home_row + strum,4,0.335130787,1.01E-13,0.335130787,TRUE,1.33E-12,TRUE
+fingers + dont_cross_home + home_row + columns,4,0.335108065,1.02E-13,0.335108065,TRUE,1.33E-12,TRUE
+skip_fingers + dont_cross_home + same_row + home_row + columns + strum + strong_fingers,7,0.33412637,1.21E-13,0.33412637,TRUE,1.55E-12,TRUE
+fingers + dont_cross_home + same_row + columns,4,0.332210704,1.70E-13,0.332210704,TRUE,2.12E-12,TRUE
+fingers + dont_cross_home + same_row + home_row + columns + strum,6,0.332027341,1.76E-13,0.332027341,TRUE,2.14E-12,TRUE
+dont_cross_home + same_row + strong_fingers,3,0.330397507,2.34E-13,0.330397507,TRUE,2.78E-12,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + home_row + columns + strong_fingers,7,0.328313062,3.37E-13,0.328313062,TRUE,3.92E-12,TRUE
+hands + same_row + home_row + columns + strong_fingers,5,0.324572972,6.44E-13,0.324572972,TRUE,7.31E-12,TRUE
+home_row + columns + strong_fingers,3,0.322492405,9.19E-13,0.322492405,TRUE,1.02E-11,TRUE
+dont_cross_home + same_row,2,0.320973526,1.19E-12,0.320973526,TRUE,1.29E-11,TRUE
+fingers + dont_cross_home + home_row + columns + strum + strong_fingers,6,0.320467896,1.30E-12,0.320467896,TRUE,1.36E-11,TRUE
+same_row + home_row,2,0.320420911,1.31E-12,0.320420911,TRUE,1.36E-11,TRUE
+same_row + home_row + strum + strong_fingers,4,0.319726063,1.47E-12,0.319726063,TRUE,1.50E-11,TRUE
+dont_cross_home + home_row,2,0.318109845,1.93E-12,0.318109845,TRUE,1.93E-11,TRUE
+fingers + dont_cross_home + columns,3,0.31576176,2.85E-12,0.31576176,TRUE,2.80E-11,TRUE
+fingers + dont_cross_home + same_row + home_row,4,0.312319496,5.03E-12,0.312319496,TRUE,4.85E-11,TRUE
+hands + dont_cross_home + same_row + home_row + columns + strum + strong_fingers,7,0.311174854,6.07E-12,0.311174854,TRUE,5.74E-11,TRUE
+fingers + same_row + home_row + strong_fingers,4,0.310124886,7.20E-12,0.310124886,TRUE,6.69E-11,TRUE
+fingers + dont_cross_home + same_row + columns + strum + strong_fingers,6,0.309916553,7.45E-12,0.309916553,TRUE,6.80E-11,TRUE
+hands + dont_cross_home + home_row + columns + strong_fingers,5,0.3096709,7.75E-12,0.3096709,TRUE,6.95E-11,TRUE
+skip_fingers + dont_cross_home + same_row + home_row + columns + strum,6,0.309095584,8.51E-12,0.309095584,TRUE,7.50E-11,TRUE
+same_row + home_row + columns + strum,4,0.308535657,9.32E-12,0.308535657,TRUE,8.07E-11,TRUE
+hands + fingers + dont_cross_home + same_row + home_row + columns + strong_fingers,7,0.307764304,1.06E-11,0.307764304,TRUE,8.99E-11,TRUE
+skip_fingers + dont_cross_home + home_row + columns,4,0.307592341,1.09E-11,0.307592341,TRUE,9.09E-11,TRUE
+skip_fingers + dont_cross_home + same_row + columns,4,0.305637524,1.49E-11,0.305637524,TRUE,1.22E-10,TRUE
+fingers + dont_cross_home + home_row + strong_fingers,4,0.304696948,1.73E-11,0.304696948,TRUE,1.40E-10,TRUE
+hands + dont_cross_home + same_row + home_row + columns,5,0.304182719,1.87E-11,0.304182719,TRUE,1.50E-10,TRUE
+skip_fingers + dont_cross_home + columns + strong_fingers,4,0.301530629,2.85E-11,0.301530629,TRUE,2.24E-10,TRUE
+fingers + same_row + home_row + columns + strum + strong_fingers,6,0.301330154,2.94E-11,0.301330154,TRUE,2.28E-10,TRUE
+fingers + dont_cross_home + same_row + home_row + strum + strong_fingers,6,0.301176345,3.01E-11,0.301176345,TRUE,2.30E-10,TRUE
+home_row + columns + strum + strong_fingers,4,0.300773624,3.21E-11,0.300773624,TRUE,2.41E-10,TRUE
+hands + dont_cross_home + same_row + columns + strong_fingers,5,0.2997203,3.78E-11,0.2997203,TRUE,2.80E-10,TRUE
+dont_cross_home + columns + strum,3,0.298265672,4.75E-11,0.298265672,TRUE,3.47E-10,TRUE
+same_row + home_row + strum,3,0.294470369,8.53E-11,0.294470369,TRUE,6.12E-10,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + home_row + columns,6,0.294393374,8.63E-11,0.294393374,TRUE,6.12E-10,TRUE
+dont_cross_home + home_row + strum + strong_fingers,4,0.293353031,1.01E-10,0.293353031,TRUE,7.07E-10,TRUE
+dont_cross_home + same_row + strum + strong_fingers,4,0.293270323,1.02E-10,0.293270323,TRUE,7.07E-10,TRUE
+fingers + dont_cross_home + home_row + columns + strum,5,0.293074782,1.06E-10,0.293074782,TRUE,7.19E-10,TRUE
+fingers + dont_cross_home + same_row + strong_fingers,4,0.29283723,1.09E-10,0.29283723,TRUE,7.36E-10,TRUE
+skip_fingers + dont_cross_home + same_row + home_row + strong_fingers,5,0.292402,1.17E-10,0.292402,TRUE,7.76E-10,TRUE
+dont_cross_home + strong_fingers,2,0.291843875,1.27E-10,0.291843875,TRUE,8.34E-10,TRUE
+home_row + strong_fingers,2,0.29164029,1.31E-10,0.29164029,TRUE,8.49E-10,TRUE
+skip_fingers + same_row + home_row + columns + strum + strong_fingers,6,0.2897171,1.75E-10,0.2897171,TRUE,1.12E-09,TRUE
+fingers + dont_cross_home + same_row + home_row + strum,5,0.287494812,2.45E-10,0.287494812,TRUE,1.54E-09,TRUE
+dont_cross_home + same_row + strum,3,0.286490086,2.84E-10,0.286490086,TRUE,1.77E-09,TRUE
+hands + dont_cross_home + same_row + home_row + columns + strum,6,0.286373971,2.89E-10,0.286373971,TRUE,1.78E-09,TRUE
+skip_fingers + dont_cross_home + home_row + columns + strum + strong_fingers,6,0.286012832,3.05E-10,0.286012832,TRUE,1.86E-09,TRUE
+fingers + skip_fingers + dont_cross_home + home_row + columns + strong_fingers,6,0.285737984,3.18E-10,0.285737984,TRUE,1.91E-09,TRUE
+hands + skip_fingers + dont_cross_home + same_row + home_row + columns + strong_fingers,7,0.284773697,3.66E-10,0.284773697,TRUE,2.18E-09,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + home_row + columns + strum + strong_fingers,8,0.284391575,3.87E-10,0.284391575,TRUE,2.28E-09,TRUE
+fingers + dont_cross_home + same_row + columns + strum,5,0.282474571,5.13E-10,0.282474571,TRUE,2.98E-09,TRUE
+dont_cross_home + home_row + strum,3,0.282255052,5.30E-10,0.282255052,TRUE,3.04E-09,TRUE
+skip_fingers + dont_cross_home + same_row + columns + strum + strong_fingers,6,0.281967664,5.53E-10,0.281967664,TRUE,3.11E-09,TRUE
+fingers + dont_cross_home + home_row,3,0.281952786,5.54E-10,0.281952786,TRUE,3.11E-09,TRUE
+skip_fingers + dont_cross_home + same_row + home_row,4,0.281858908,5.62E-10,0.281858908,TRUE,3.12E-09,TRUE
+skip_fingers + same_row + home_row + strong_fingers,4,0.28159361,5.84E-10,0.28159361,TRUE,3.21E-09,TRUE
+same_row + columns + strum + strong_fingers,4,0.28057072,6.77E-10,0.28057072,TRUE,3.68E-09,TRUE
+fingers + dont_cross_home + same_row,3,0.279232546,8.22E-10,0.279232546,TRUE,4.42E-09,TRUE
+same_row + home_row + columns,3,0.27800967,9.80E-10,0.27800967,TRUE,5.22E-09,TRUE
+skip_fingers + same_row + home_row + columns,4,0.277550549,1.05E-09,0.277550549,TRUE,5.51E-09,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + columns + strong_fingers,6,0.277375169,1.07E-09,0.277375169,TRUE,5.60E-09,TRUE
+fingers + skip_fingers + same_row + home_row + columns + strong_fingers,6,0.275892394,1.33E-09,0.275892394,TRUE,6.85E-09,TRUE
+hands + dont_cross_home + same_row + columns,4,0.274531313,1.61E-09,0.274531313,TRUE,8.22E-09,TRUE
+skip_fingers + home_row + columns + strong_fingers,4,0.273811902,1.78E-09,0.273811902,TRUE,9.01E-09,TRUE
+fingers + home_row + columns + strong_fingers,4,0.272975927,2.00E-09,0.272975927,TRUE,1.00E-08,TRUE
+hands + fingers + dont_cross_home + same_row + home_row + columns,6,0.272859253,2.04E-09,0.272859253,TRUE,1.01E-08,TRUE
+hands + same_row + home_row + columns + strum + strong_fingers,6,0.272578679,2.12E-09,0.272578679,TRUE,1.04E-08,TRUE
+hands + dont_cross_home + home_row + columns,4,0.271628896,2.42E-09,0.271628896,TRUE,1.18E-08,TRUE
+fingers + dont_cross_home + columns + strum + strong_fingers,5,0.27039397,2.88E-09,0.27039397,TRUE,1.39E-08,TRUE
+hands + dont_cross_home + same_row + home_row + strong_fingers,5,0.270317978,2.91E-09,0.270317978,TRUE,1.39E-08,TRUE
+hands + fingers + same_row + home_row + columns + strong_fingers,6,0.268649737,3.66E-09,0.268649737,TRUE,1.73E-08,TRUE
+same_row + columns + strong_fingers,3,0.268559931,3.71E-09,0.268559931,TRUE,1.74E-08,TRUE
+skip_fingers + dont_cross_home + same_row + home_row + strum + strong_fingers,6,0.268309849,3.84E-09,0.268309849,TRUE,1.78E-08,TRUE
+hands + fingers + dont_cross_home + same_row + home_row + columns + strum + strong_fingers,8,0.267501394,4.29E-09,0.267501394,TRUE,1.97E-08,TRUE
+hands + same_row + home_row + columns,4,0.264428513,6.53E-09,0.264428513,TRUE,2.98E-08,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + home_row + columns + strum,7,0.264039527,6.88E-09,0.264039527,TRUE,3.11E-08,TRUE
+hands + same_row + home_row + strong_fingers,4,0.263782491,7.13E-09,0.263782491,TRUE,3.19E-08,TRUE
+hands + dont_cross_home + home_row + columns + strum + strong_fingers,6,0.263068085,7.85E-09,0.263068085,TRUE,3.49E-08,TRUE
+fingers + same_row + home_row,3,0.262943571,7.98E-09,0.262943571,TRUE,3.52E-08,TRUE
+hands + dont_cross_home + same_row + columns + strum + strong_fingers,6,0.262254175,8.76E-09,0.262254175,TRUE,3.83E-08,TRUE
+hands + fingers + dont_cross_home + home_row + columns + strong_fingers,6,0.260982551,1.04E-08,0.260982551,TRUE,4.50E-08,TRUE
+fingers + same_row + home_row + columns,4,0.260520165,1.11E-08,0.260520165,TRUE,4.75E-08,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + home_row + strong_fingers,6,0.259768847,1.22E-08,0.259768847,TRUE,5.20E-08,TRUE
+hands + fingers + dont_cross_home + same_row + columns + strong_fingers,6,0.25908753,1.34E-08,0.25908753,TRUE,5.65E-08,TRUE
+fingers + same_row + home_row + strum + strong_fingers,5,0.25842395,1.46E-08,0.25842395,TRUE,6.12E-08,TRUE
+fingers + same_row + home_row + columns + strum,5,0.25780776,1.58E-08,0.25780776,TRUE,6.58E-08,TRUE
+hands + skip_fingers + dont_cross_home + same_row + home_row + columns + strum + strong_fingers,8,0.257709681,1.61E-08,0.257709681,TRUE,6.61E-08,TRUE
+skip_fingers + dont_cross_home + home_row + columns + strum,5,0.255963517,2.02E-08,0.255963517,TRUE,8.22E-08,TRUE
+hands + dont_cross_home + same_row + home_row + strum + strong_fingers,6,0.255933865,2.03E-08,0.255933865,TRUE,8.22E-08,TRUE
+hands + skip_fingers + dont_cross_home + same_row + home_row + columns,6,0.254315585,2.50E-08,0.254315585,TRUE,1.01E-07,TRUE
+hands + skip_fingers + same_row + home_row + columns + strong_fingers,6,0.253968404,2.62E-08,0.253968404,TRUE,1.05E-07,TRUE
+skip_fingers + dont_cross_home + same_row + home_row + strum,5,0.253847865,2.66E-08,0.253847865,TRUE,1.05E-07,TRUE
+fingers + dont_cross_home + home_row + strum + strong_fingers,5,0.253840607,2.66E-08,0.253840607,TRUE,1.05E-07,TRUE
+same_row + strong_fingers,2,0.25370258,2.71E-08,0.25370258,TRUE,1.06E-07,TRUE
+hands + dont_cross_home + columns + strong_fingers,4,0.253659555,2.73E-08,0.253659555,TRUE,1.06E-07,TRUE
+fingers + dont_cross_home + columns + strum,4,0.253047902,2.95E-08,0.253047902,TRUE,1.13E-07,TRUE
+fingers + skip_fingers + dont_cross_home + home_row + columns,5,0.252038387,3.36E-08,0.252038387,TRUE,1.28E-07,TRUE
+skip_fingers + same_row + home_row,3,0.251733242,3.50E-08,0.251733242,TRUE,1.32E-07,TRUE
+skip_fingers + same_row + home_row + columns + strum,5,0.251066463,3.81E-08,0.251066463,TRUE,1.43E-07,TRUE
+skip_fingers + dont_cross_home + same_row + columns + strum,5,0.251014326,3.84E-08,0.251014326,TRUE,1.43E-07,TRUE
+fingers + dont_cross_home + same_row + strum + strong_fingers,5,0.248554195,5.25E-08,0.248554195,TRUE,1.94E-07,TRUE
+skip_fingers + dont_cross_home + same_row + strong_fingers,4,0.248149299,5.53E-08,0.248149299,TRUE,2.03E-07,TRUE
+skip_fingers + same_row + columns + strong_fingers,4,0.247801257,5.78E-08,0.247801257,TRUE,2.11E-07,TRUE
+home_row,1,0.247634785,5.90E-08,0.247634785,TRUE,2.14E-07,TRUE
+hands + home_row + columns + strong_fingers,4,0.24602308,7.23E-08,0.24602308,TRUE,2.60E-07,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + home_row,5,0.244849276,8.38E-08,0.244849276,TRUE,2.99E-07,TRUE
+hands + fingers + dont_cross_home + same_row + home_row + strong_fingers,6,0.244641588,8.60E-08,0.244641588,TRUE,3.05E-07,TRUE
+hands + fingers + dont_cross_home + same_row + home_row + columns + strum,7,0.244490011,8.76E-08,0.244490011,TRUE,3.09E-07,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + columns,5,0.244104398,9.19E-08,0.244104398,TRUE,3.22E-07,TRUE
+hands + same_row + home_row,3,0.24306647,1.05E-07,0.24306647,TRUE,3.61E-07,TRUE
+hands + dont_cross_home + same_row + home_row,4,0.24306647,1.05E-07,0.24306647,TRUE,3.61E-07,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + home_row + columns + strong_fingers,8,0.241971929,1.20E-07,0.241971929,TRUE,4.11E-07,TRUE
+fingers + home_row + strong_fingers,3,0.241181267,1.32E-07,0.241181267,TRUE,4.50E-07,TRUE
+fingers + dont_cross_home + home_row + strum,4,0.239346422,1.65E-07,0.239346422,TRUE,5.59E-07,TRUE
+fingers + skip_fingers + dont_cross_home + home_row + columns + strum + strong_fingers,7,0.23857859,1.81E-07,0.23857859,TRUE,6.10E-07,TRUE
+skip_fingers + dont_cross_home + same_row,3,0.238254391,1.89E-07,0.238254391,TRUE,6.30E-07,TRUE
+fingers + dont_cross_home + strong_fingers,3,0.237944102,1.96E-07,0.237944102,TRUE,6.50E-07,TRUE
+skip_fingers + same_row + home_row + strum + strong_fingers,5,0.237712958,2.02E-07,0.237712958,TRUE,6.64E-07,TRUE
+hands + skip_fingers + dont_cross_home + home_row + columns + strong_fingers,6,0.237649386,2.03E-07,0.237649386,TRUE,6.65E-07,TRUE
+hands + dont_cross_home + same_row + home_row + strum,5,0.236960615,2.21E-07,0.236960615,TRUE,7.18E-07,TRUE
+home_row + strum + strong_fingers,3,0.236636415,2.29E-07,0.236636415,TRUE,7.42E-07,TRUE
+fingers + same_row + columns + strong_fingers,4,0.236245587,2.41E-07,0.236245587,TRUE,7.73E-07,TRUE
+skip_fingers + dont_cross_home + columns,3,0.236183794,2.42E-07,0.236183794,TRUE,7.73E-07,TRUE
+dont_cross_home + strum + strong_fingers,3,0.236138206,2.44E-07,0.236138206,TRUE,7.73E-07,TRUE
+fingers + home_row + columns + strum + strong_fingers,5,0.23584127,2.53E-07,0.23584127,TRUE,7.97E-07,TRUE
+fingers + skip_fingers + same_row + home_row + columns + strum + strong_fingers,7,0.235732799,2.56E-07,0.235732799,TRUE,8.02E-07,TRUE
+fingers + same_row + home_row + strum,4,0.235603021,2.60E-07,0.235603021,TRUE,8.10E-07,TRUE
+hands + skip_fingers + dont_cross_home + same_row + columns + strong_fingers,6,0.235505629,2.63E-07,0.235505629,TRUE,8.14E-07,TRUE
+fingers + dont_cross_home,2,0.235325241,2.69E-07,0.235325241,TRUE,8.27E-07,TRUE
+fingers + dont_cross_home + same_row + strum,4,0.235083016,2.77E-07,0.235083016,TRUE,8.46E-07,TRUE
+hands + same_row + home_row + columns + strum,5,0.234593562,2.93E-07,0.234593562,TRUE,8.92E-07,TRUE
+hands + same_row + home_row + strum + strong_fingers,5,0.233742648,3.25E-07,0.233742648,TRUE,9.78E-07,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + columns + strum + strong_fingers,7,0.23371685,3.26E-07,0.23371685,TRUE,9.78E-07,TRUE
+home_row + columns + strum,3,0.233583373,3.31E-07,0.233583373,TRUE,9.88E-07,TRUE
+skip_fingers + dont_cross_home + columns + strum + strong_fingers,5,0.233229176,3.45E-07,0.233229176,TRUE,1.02E-06,TRUE
+skip_fingers + dont_cross_home + home_row + strong_fingers,4,0.233044911,3.53E-07,0.233044911,TRUE,1.04E-06,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + home_row + strum + strong_fingers,7,0.232931759,3.57E-07,0.232931759,TRUE,1.05E-06,TRUE
+same_row + columns + strum,3,0.232681207,3.68E-07,0.232681207,TRUE,1.07E-06,TRUE
+same_row + strum + strong_fingers,3,0.22967817,5.24E-07,0.22967817,TRUE,1.52E-06,TRUE
+hands + dont_cross_home + same_row + columns + strum,5,0.229476155,5.36E-07,0.229476155,TRUE,1.55E-06,TRUE
+hands + dont_cross_home + home_row + columns + strum,5,0.229151652,5.57E-07,0.229151652,TRUE,1.60E-06,TRUE
+hands + fingers + dont_cross_home + home_row + columns,5,0.228226089,6.20E-07,0.228226089,TRUE,1.77E-06,TRUE
+hands + skip_fingers + dont_cross_home + same_row + home_row + columns + strum,7,0.227289314,6.92E-07,0.227289314,TRUE,1.96E-06,TRUE
+dont_cross_home + strum,2,0.227236397,6.96E-07,0.227236397,TRUE,1.96E-06,TRUE
+fingers + skip_fingers + same_row + home_row + columns,5,0.227205835,6.98E-07,0.227205835,TRUE,1.96E-06,TRUE
+hands + fingers + dont_cross_home + same_row + home_row + strum + strong_fingers,7,0.226773437,7.34E-07,0.226773437,TRUE,2.05E-06,TRUE
+hands + fingers + dont_cross_home + same_row + columns,5,0.226594571,7.49E-07,0.226594571,TRUE,2.08E-06,TRUE
+hands + fingers + dont_cross_home + same_row + home_row,5,0.225685963,8.32E-07,0.225685963,TRUE,2.30E-06,TRUE
+hands + same_row + columns + strong_fingers,4,0.225221852,8.77E-07,0.225221852,TRUE,2.41E-06,TRUE
+hands + skip_fingers + dont_cross_home + same_row + home_row + strum + strong_fingers,7,0.225186948,8.81E-07,0.225186948,TRUE,2.41E-06,TRUE
+hands + dont_cross_home + same_row + strong_fingers,4,0.224568857,9.45E-07,0.224568857,TRUE,2.57E-06,TRUE
+hands + fingers + same_row + home_row + strong_fingers,5,0.224497807,9.53E-07,0.224497807,TRUE,2.58E-06,TRUE
+fingers + skip_fingers + dont_cross_home + columns + strong_fingers,5,0.224019487,1.01E-06,0.224019487,TRUE,2.71E-06,TRUE
+skip_fingers + dont_cross_home + home_row,3,0.222967259,1.13E-06,0.222967259,TRUE,3.03E-06,TRUE
+hands + fingers + same_row + home_row + columns,5,0.222918025,1.14E-06,0.222918025,TRUE,3.03E-06,TRUE
+hands + skip_fingers + dont_cross_home + same_row + home_row + strong_fingers,6,0.222362759,1.21E-06,0.222362759,TRUE,3.21E-06,TRUE
+fingers + same_row + columns + strum + strong_fingers,5,0.221969008,1.27E-06,0.221969008,TRUE,3.34E-06,TRUE
+skip_fingers + dont_cross_home + same_row + strum + strong_fingers,5,0.22127132,1.37E-06,0.22127132,TRUE,3.60E-06,TRUE
+fingers + skip_fingers + dont_cross_home + home_row + columns + strum,6,0.220902883,1.43E-06,0.220902883,TRUE,3.73E-06,TRUE
+fingers + skip_fingers + same_row + home_row + strong_fingers,5,0.220748941,1.46E-06,0.220748941,TRUE,3.78E-06,TRUE
+hands + fingers + same_row + home_row + columns + strum + strong_fingers,7,0.220333688,1.53E-06,0.220333688,TRUE,3.94E-06,TRUE
+skip_fingers + dont_cross_home + home_row + strum + strong_fingers,5,0.219997762,1.58E-06,0.219997762,TRUE,4.07E-06,TRUE
+hands + fingers + dont_cross_home + same_row + columns + strum + strong_fingers,7,0.219418512,1.69E-06,0.219418512,TRUE,4.32E-06,TRUE
+hands + skip_fingers + dont_cross_home + same_row + columns + strum + strong_fingers,7,0.219347422,1.70E-06,0.219347422,TRUE,4.33E-06,TRUE
+hands + skip_fingers + dont_cross_home + home_row + columns + strum + strong_fingers,7,0.218221058,1.93E-06,0.218221058,TRUE,4.88E-06,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + home_row + strum,6,0.217973948,1.98E-06,0.217973948,TRUE,4.99E-06,TRUE
+hands + skip_fingers + same_row + home_row + columns + strum + strong_fingers,7,0.217255594,2.15E-06,0.217255594,TRUE,5.38E-06,TRUE
+hands + fingers + dont_cross_home + home_row + columns + strum + strong_fingers,7,0.2163959,2.36E-06,0.2163959,TRUE,5.88E-06,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + home_row + columns + strum + strong_fingers,9,0.215941166,2.48E-06,0.215941166,TRUE,6.15E-06,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + home_row + columns,7,0.215760647,2.53E-06,0.215760647,TRUE,6.25E-06,TRUE
+hands + dont_cross_home + same_row + strum + strong_fingers,5,0.215676268,2.55E-06,0.215676268,TRUE,6.27E-06,TRUE
+skip_fingers + home_row + columns + strum + strong_fingers,5,0.215609143,2.57E-06,0.215609143,TRUE,6.29E-06,TRUE
+hands + dont_cross_home + home_row + strum + strong_fingers,5,0.215523427,2.60E-06,0.215523427,TRUE,6.32E-06,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + columns + strum,6,0.213027915,3.41E-06,0.213027915,TRUE,8.25E-06,TRUE
+hands + skip_fingers + same_row + home_row + strong_fingers,5,0.212273463,3.70E-06,0.212273463,TRUE,8.91E-06,TRUE
+hands + dont_cross_home + columns + strum + strong_fingers,5,0.212062379,3.78E-06,0.212062379,TRUE,9.07E-06,TRUE
+hands + skip_fingers + dont_cross_home + columns + strong_fingers,5,0.211784057,3.90E-06,0.211784057,TRUE,9.30E-06,TRUE
+skip_fingers + same_row + home_row + strum,4,0.211627394,3.96E-06,0.211627394,TRUE,9.41E-06,TRUE
+skip_fingers + same_row + columns + strum + strong_fingers,5,0.210955355,4.26E-06,0.210955355,TRUE,1.01E-05,TRUE
+columns + strong_fingers,2,0.210595733,4.42E-06,0.210595733,TRUE,1.04E-05,TRUE
+hands + dont_cross_home + same_row,3,0.210593717,4.43E-06,0.210593717,TRUE,1.04E-05,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + strong_fingers,5,0.209811937,4.81E-06,0.209811937,TRUE,1.12E-05,TRUE
+fingers + same_row + strong_fingers,3,0.209795008,4.82E-06,0.209795008,TRUE,1.12E-05,TRUE
+fingers + skip_fingers + same_row + home_row + columns + strum,6,0.209596044,4.92E-06,0.209596044,TRUE,1.14E-05,TRUE
+hands + dont_cross_home + home_row + strong_fingers,4,0.209556891,4.94E-06,0.209556891,TRUE,1.14E-05,TRUE
+home_row + strum,2,0.206663412,6.71E-06,0.206663412,TRUE,1.53E-05,TRUE
+fingers + skip_fingers + dont_cross_home + home_row + strong_fingers,5,0.206646976,6.72E-06,0.206646976,TRUE,1.53E-05,TRUE
+skip_fingers + dont_cross_home + same_row + strum,4,0.205693075,7.42E-06,0.205693075,TRUE,1.69E-05,TRUE
+hands + skip_fingers + same_row + home_row + columns,5,0.204731652,8.21E-06,0.204731652,TRUE,1.86E-05,TRUE
+hands + fingers + dont_cross_home + same_row + home_row + strum,6,0.204543149,8.37E-06,0.204543149,TRUE,1.88E-05,TRUE
+fingers + skip_fingers + home_row + columns + strong_fingers,5,0.204293493,8.59E-06,0.204293493,TRUE,1.92E-05,TRUE
+hands + skip_fingers + dont_cross_home + same_row + home_row,5,0.203747049,9.09E-06,0.203747049,TRUE,2.03E-05,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + home_row + strong_fingers,7,0.203186665,9.63E-06,0.203186665,TRUE,2.14E-05,TRUE
+hands + fingers + dont_cross_home + same_row + strong_fingers,5,0.201781551,1.11E-05,0.201781551,TRUE,2.46E-05,TRUE
+hands + skip_fingers + dont_cross_home + same_row + home_row + strum,6,0.201542248,1.14E-05,0.201542248,TRUE,2.51E-05,TRUE
+hands + same_row + home_row + strum,4,0.201460902,1.15E-05,0.201460902,TRUE,2.52E-05,TRUE
+same_row + strum,2,0.200829148,1.23E-05,0.200829148,TRUE,2.68E-05,TRUE
+same_row,1,0.200783998,1.23E-05,0.200783998,TRUE,2.68E-05,TRUE
+skip_fingers + dont_cross_home + home_row + strum,4,0.199759274,1.37E-05,0.199759274,TRUE,2.96E-05,TRUE
+hands + dont_cross_home + columns,3,0.198430361,1.56E-05,0.198430361,TRUE,3.37E-05,TRUE
+hands + fingers + skip_fingers + same_row + home_row + columns + strong_fingers,7,0.19820479,1.60E-05,0.19820479,TRUE,3.43E-05,TRUE
+hands + skip_fingers + dont_cross_home + same_row + columns,5,0.198169301,1.60E-05,0.198169301,TRUE,3.43E-05,TRUE
+hands + home_row + columns + strum + strong_fingers,5,0.196909358,1.82E-05,0.196909358,TRUE,3.87E-05,TRUE
+hands + fingers + dont_cross_home + columns + strong_fingers,5,0.196888139,1.82E-05,0.196888139,TRUE,3.87E-05,TRUE
+hands + same_row + columns + strum + strong_fingers,5,0.196806737,1.84E-05,0.196806737,TRUE,3.88E-05,TRUE
+hands + fingers + dont_cross_home + home_row + strong_fingers,5,0.196779212,1.84E-05,0.196779212,TRUE,3.88E-05,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + columns + strong_fingers,7,0.196671969,1.86E-05,0.196671969,TRUE,3.89E-05,TRUE
+home_row + columns,2,0.196658898,1.87E-05,0.196658898,TRUE,3.89E-05,TRUE
+hands + skip_fingers + dont_cross_home + home_row + columns,5,0.196216488,1.95E-05,0.196216488,TRUE,4.05E-05,TRUE
+columns + strum + strong_fingers,3,0.196148336,1.96E-05,0.196148336,TRUE,4.06E-05,TRUE
+skip_fingers + home_row + columns,3,0.195907799,2.01E-05,0.195907799,TRUE,4.14E-05,TRUE
+skip_fingers + dont_cross_home + columns + strum,4,0.195181786,2.16E-05,0.195181786,TRUE,4.44E-05,TRUE
+hands + skip_fingers + same_row + home_row + strum + strong_fingers,6,0.195086033,2.18E-05,0.195086033,TRUE,4.46E-05,TRUE
+hands + skip_fingers + dont_cross_home + home_row + strum + strong_fingers,6,0.19446819,2.32E-05,0.19446819,TRUE,4.72E-05,TRUE
+hands + dont_cross_home + same_row + strum,4,0.193979616,2.43E-05,0.193979616,TRUE,4.94E-05,TRUE
+fingers + skip_fingers + same_row + home_row,4,0.193568372,2.53E-05,0.193568372,TRUE,5.12E-05,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + home_row + strum + strong_fingers,8,0.193036966,2.67E-05,0.193036966,TRUE,5.36E-05,TRUE
+hands + fingers + same_row + home_row + columns + strum,6,0.193020823,2.67E-05,0.193020823,TRUE,5.36E-05,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + home_row + columns + strum,8,0.192938298,2.70E-05,0.192938298,TRUE,5.37E-05,TRUE
+hands + fingers + skip_fingers + dont_cross_home + home_row + columns + strong_fingers,7,0.192894951,2.71E-05,0.192894951,TRUE,5.37E-05,TRUE
+fingers + home_row + columns + strum,4,0.192884252,2.71E-05,0.192884252,TRUE,5.37E-05,TRUE
+fingers + skip_fingers + dont_cross_home + same_row,4,0.192605489,2.78E-05,0.192605489,TRUE,5.49E-05,TRUE
+hands + fingers + dont_cross_home + same_row + columns + strum,6,0.192539134,2.80E-05,0.192539134,TRUE,5.51E-05,TRUE
+skip_fingers + same_row + columns,3,0.191136516,3.21E-05,0.191136516,TRUE,6.29E-05,TRUE
+fingers + dont_cross_home + strum + strong_fingers,4,0.19105201,3.24E-05,0.19105201,TRUE,6.32E-05,TRUE
+hands + skip_fingers + dont_cross_home + same_row + strum + strong_fingers,6,0.190803645,3.32E-05,0.190803645,TRUE,6.45E-05,TRUE
+hands + fingers + dont_cross_home + home_row + columns + strum,6,0.190552373,3.40E-05,0.190552373,TRUE,6.58E-05,TRUE
+fingers + skip_fingers + same_row + columns + strong_fingers,5,0.190145433,3.54E-05,0.190145433,TRUE,6.82E-05,TRUE
+hands + fingers + home_row + columns + strong_fingers,5,0.190104255,3.55E-05,0.190104255,TRUE,6.82E-05,TRUE
+fingers + skip_fingers + same_row + home_row + strum + strong_fingers,6,0.189955157,3.60E-05,0.189955157,TRUE,6.89E-05,TRUE
+fingers + home_row,2,0.189863928,3.63E-05,0.189863928,TRUE,6.93E-05,TRUE
+fingers + skip_fingers + dont_cross_home + home_row,4,0.188789028,4.03E-05,0.188789028,TRUE,7.65E-05,TRUE
+hands + fingers + same_row + home_row,4,0.188472732,4.15E-05,0.188472732,TRUE,7.86E-05,TRUE
+fingers + home_row + strum + strong_fingers,4,0.188332655,4.21E-05,0.188332655,TRUE,7.94E-05,TRUE
+hands + dont_cross_home + home_row + strum,4,0.187507861,4.55E-05,0.187507861,TRUE,8.54E-05,TRUE
+fingers + skip_fingers + dont_cross_home + columns,4,0.18747478,4.57E-05,0.18747478,TRUE,8.54E-05,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + strum + strong_fingers,6,0.187445579,4.58E-05,0.187445579,TRUE,8.54E-05,TRUE
+hands + dont_cross_home + strum + strong_fingers,4,0.187209447,4.68E-05,0.187209447,TRUE,8.70E-05,TRUE
+hands + fingers + dont_cross_home + same_row + strum + strong_fingers,6,0.186803819,4.87E-05,0.186803819,TRUE,9.01E-05,TRUE
+hands + fingers + same_row + home_row + strum + strong_fingers,6,0.186052781,5.23E-05,0.186052781,TRUE,9.64E-05,TRUE
+skip_fingers + home_row + strong_fingers,3,0.185747762,5.38E-05,0.185747762,TRUE,9.89E-05,TRUE
+hands + skip_fingers + dont_cross_home + same_row + columns + strum,6,0.185424432,5.55E-05,0.185424432,TRUE,0.000101582,TRUE
+hands + skip_fingers + dont_cross_home + same_row + strong_fingers,5,0.184772647,5.90E-05,0.184772647,TRUE,0.000107614,TRUE
+fingers + dont_cross_home + strum,3,0.1844221,6.09E-05,0.1844221,TRUE,0.000110813,TRUE
+hands + fingers + dont_cross_home + home_row + strum + strong_fingers,6,0.184163635,6.24E-05,0.184163635,TRUE,0.000113124,TRUE
+fingers + skip_fingers + dont_cross_home + home_row + strum + strong_fingers,6,0.184070172,6.30E-05,0.184070172,TRUE,0.000113714,TRUE
+hands + skip_fingers + dont_cross_home + columns + strum + strong_fingers,6,0.183699814,6.52E-05,0.183699814,TRUE,0.000117302,TRUE
+fingers + skip_fingers + dont_cross_home + columns + strum + strong_fingers,6,0.1836298,6.56E-05,0.1836298,TRUE,0.000117656,TRUE
+hands + skip_fingers + dont_cross_home + home_row + strong_fingers,5,0.183492062,6.65E-05,0.183492062,TRUE,0.00011876,TRUE
+skip_fingers + same_row + strong_fingers,3,0.183386249,6.71E-05,0.183386249,TRUE,0.000119519,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + home_row,6,0.181798455,7.78E-05,0.181798455,TRUE,0.000138004,TRUE
+hands + fingers + same_row + columns + strong_fingers,5,0.181503192,7.99E-05,0.181503192,TRUE,0.000141326,TRUE
+fingers + same_row + columns + strum,4,0.181332374,8.12E-05,0.181332374,TRUE,0.000143074,TRUE
+hands + fingers + dont_cross_home + same_row,4,0.179701325,9.43E-05,0.179701325,TRUE,0.000165596,TRUE
+fingers + home_row + columns,3,0.179575168,9.54E-05,0.179575168,TRUE,0.000166941,TRUE
+hands + home_row + columns,3,0.179527107,9.58E-05,0.179527107,TRUE,0.000167102,TRUE
+hands + dont_cross_home + home_row,3,0.179360995,9.73E-05,0.179360995,TRUE,0.000169077,TRUE
+fingers + same_row + strum + strong_fingers,4,0.178336874,0.00010677,0.178336874,TRUE,0.000184948,TRUE
+hands + skip_fingers + dont_cross_home + home_row + columns + strum,6,0.177778502,0.000112306,0.177778502,TRUE,0.00019388,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + columns + strum + strong_fingers,8,0.17718855,0.000118449,0.17718855,TRUE,0.000203795,TRUE
+hands + skip_fingers + same_row + home_row + columns + strum,6,0.176760616,0.0001231,0.176760616,TRUE,0.000211087,TRUE
+hands + skip_fingers + same_row + home_row,4,0.175490777,0.000137933,0.175490777,TRUE,0.000235731,TRUE
+hands + skip_fingers + home_row + columns + strong_fingers,5,0.175189417,0.000141691,0.175189417,TRUE,0.000241348,TRUE
+fingers + skip_fingers + home_row + columns + strum + strong_fingers,6,0.175028427,0.000143738,0.175028427,TRUE,0.000244021,TRUE
+fingers + same_row + columns,3,0.174894661,0.00014546,0.174894661,TRUE,0.000246127,TRUE
+hands + home_row + strong_fingers,3,0.173475686,0.000164959,0.173475686,TRUE,0.000278198,TRUE
+hands + fingers + skip_fingers + dont_cross_home + home_row + columns + strum + strong_fingers,8,0.172537722,0.000179166,0.172537722,TRUE,0.000301163,TRUE
+fingers + skip_fingers + same_row + home_row + strum,5,0.172394268,0.000181437,0.172394268,TRUE,0.000303981,TRUE
+skip_fingers + home_row + columns + strum,4,0.171423623,0.000197529,0.171423623,TRUE,0.000329861,TRUE
+hands + fingers + skip_fingers + same_row + home_row + columns + strum + strong_fingers,8,0.171320276,0.000199319,0.171320276,TRUE,0.000331361,TRUE
+skip_fingers + dont_cross_home + strum + strong_fingers,4,0.171296989,0.000199724,0.171296989,TRUE,0.000331361,TRUE
+hands + same_row + strong_fingers,3,0.170169219,0.000220309,0.170169219,TRUE,0.000364329,TRUE
+skip_fingers + dont_cross_home + strong_fingers,3,0.169844468,0.000226594,0.169844468,TRUE,0.000373515,TRUE
+fingers + skip_fingers + dont_cross_home + same_row + strum,5,0.169708397,0.000229278,0.169708397,TRUE,0.000376723,TRUE
+hands + skip_fingers + same_row + columns + strong_fingers,5,0.169075333,0.000242157,0.169075333,TRUE,0.00039661,TRUE
+hands + dont_cross_home + strong_fingers,3,0.168615924,0.000251924,0.168615924,TRUE,0.000411288,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + home_row + strum,7,0.168461991,0.000255278,0.168461991,TRUE,0.000415436,TRUE
+same_row + columns,2,0.1678062,0.00027004,0.1678062,TRUE,0.000438065,TRUE
+fingers + skip_fingers + same_row + columns + strum + strong_fingers,6,0.167441587,0.000278589,0.167441587,TRUE,0.000450503,TRUE
+hands + same_row + columns,3,0.167042504,0.000288235,0.167042504,TRUE,0.000464632,TRUE
+hands + skip_fingers + dont_cross_home + same_row + strum,5,0.166537557,0.000300888,0.166537557,TRUE,0.000483502,TRUE
+hands + fingers + dont_cross_home + home_row,4,0.166372747,0.000305128,0.166372747,TRUE,0.000488779,TRUE
+skip_fingers + same_row + columns + strum,4,0.165370005,0.000332155,0.165370005,TRUE,0.00053041,TRUE
+hands + fingers + skip_fingers + dont_cross_home + home_row + strong_fingers,6,0.165269165,0.000334993,0.165269165,TRUE,0.000533276,TRUE
+hands + fingers + skip_fingers + same_row + home_row + strong_fingers,6,0.165210944,0.000336642,0.165210944,TRUE,0.000534236,TRUE
+fingers + home_row + strum,3,0.164768038,0.000349436,0.164768038,TRUE,0.000551353,TRUE
+fingers + skip_fingers + dont_cross_home + columns + strum,5,0.16476294,0.000349586,0.16476294,TRUE,0.000551353,TRUE
+hands + skip_fingers + dont_cross_home + same_row,4,0.164254642,0.000364832,0.164254642,TRUE,0.000572687,TRUE
+fingers + same_row,2,0.164237602,0.000365354,0.164237602,TRUE,0.000572687,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + columns,6,0.164076561,0.000370319,0.164076561,TRUE,0.000578694,TRUE
+fingers + skip_fingers + dont_cross_home + home_row + strum,5,0.163979822,0.000373332,0.163979822,TRUE,0.000581623,TRUE
+skip_fingers + home_row + strum + strong_fingers,4,0.163842285,0.000377654,0.163842285,TRUE,0.000585469,TRUE
+hands + fingers + skip_fingers + same_row + home_row + columns,6,0.163828455,0.000378091,0.163828455,TRUE,0.000585469,TRUE
+hands + skip_fingers + dont_cross_home + strum + strong_fingers,5,0.163709134,0.000381883,0.163709134,TRUE,0.000589554,TRUE
+hands + fingers + dont_cross_home + same_row + strum,5,0.16294236,0.000407108,0.16294236,TRUE,0.000626603,TRUE
+hands + home_row + strum + strong_fingers,4,0.162693175,0.000415634,0.162693175,TRUE,0.000637805,TRUE
+hands + skip_fingers + dont_cross_home + home_row + strum,5,0.162581406,0.000419512,0.162581406,TRUE,0.000641828,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + strong_fingers,6,0.162425096,0.000424992,0.162425096,TRUE,0.000648271,TRUE
+hands + dont_cross_home + columns + strum,4,0.161284063,0.000467058,0.161284063,TRUE,0.000710317,TRUE
+hands + skip_fingers + same_row + home_row + strum,5,0.160412768,0.000501752,0.160412768,TRUE,0.000760817,TRUE
+hands + skip_fingers + dont_cross_home + home_row,4,0.159905084,0.000523057,0.159905084,TRUE,0.000790775,TRUE
+hands + fingers + dont_cross_home + strong_fingers,4,0.159666901,0.000533339,0.159666901,TRUE,0.000803942,TRUE
+hands + fingers + dont_cross_home + columns + strum + strong_fingers,6,0.159333106,0.000548065,0.159333106,TRUE,0.00082371,TRUE
+skip_fingers + same_row + strum + strong_fingers,4,0.159254703,0.000551578,0.159254703,TRUE,0.000826559,TRUE
+hands + fingers + skip_fingers + dont_cross_home + home_row + strum + strong_fingers,7,0.158706721,0.000576723,0.158706721,TRUE,0.000861712,TRUE
+hands + skip_fingers + dont_cross_home + strong_fingers,4,0.158555139,0.000583864,0.158555139,TRUE,0.000869839,TRUE
+skip_fingers + same_row,2,0.158405982,0.000590971,0.158405982,TRUE,0.000877867,TRUE
+hands + fingers + skip_fingers + dont_cross_home + home_row + columns,6,0.158254921,0.00059825,0.158254921,TRUE,0.000886104,TRUE
+hands + fingers + same_row + home_row + strum,5,0.158071267,0.000607212,0.158071267,TRUE,0.000896779,TRUE
+hands + same_row + strum + strong_fingers,4,0.157718994,0.000624752,0.157718994,TRUE,0.000920024,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + strum + strong_fingers,7,0.157129457,0.00065516,0.157129457,TRUE,0.00096203,TRUE
+hands + skip_fingers + same_row + columns + strum + strong_fingers,6,0.156765506,0.000674611,0.156765506,TRUE,0.000987754,TRUE
+fingers + columns + strong_fingers,3,0.156077029,0.000712877,0.156077029,TRUE,0.0010408,TRUE
+fingers + skip_fingers + home_row + columns,4,0.155476875,0.000747864,0.155476875,TRUE,0.001088771,TRUE
+hands + fingers + same_row + columns + strum + strong_fingers,6,0.154824997,0.000787663,0.154824997,TRUE,0.001143454,TRUE
+hands + skip_fingers + home_row + columns + strum + strong_fingers,6,0.154744976,0.000792682,0.154744976,TRUE,0.001147479,TRUE
+skip_fingers + dont_cross_home,2,0.154086939,0.000835084,0.154086939,TRUE,0.001205446,TRUE
+skip_fingers + home_row,2,0.152861412,0.000919693,0.152861412,TRUE,0.00132384,TRUE
+hands + fingers + home_row + columns + strum + strong_fingers,6,0.152323947,0.000959241,0.152323947,TRUE,0.001376888,TRUE
+fingers + columns + strum + strong_fingers,4,0.152033958,0.000981225,0.152033958,TRUE,0.001404498,TRUE
+fingers + same_row + strum,3,0.151817628,0.000997927,0.151817628,TRUE,0.001424415,TRUE
+hands + fingers + skip_fingers + dont_cross_home + columns + strong_fingers,6,0.151761663,0.00100229,0.151761663,TRUE,0.001426658,TRUE
+fingers + skip_fingers + home_row + columns + strum,5,0.151286497,0.001040052,0.151286497,TRUE,0.001476295,TRUE
+hands + fingers + dont_cross_home + home_row + strum,5,0.150674522,0.001090619,0.150674522,TRUE,0.001543785,TRUE
+hands + fingers + skip_fingers + same_row + home_row + strum + strong_fingers,7,0.150598995,0.001097015,0.150598995,TRUE,0.001548548,TRUE
+skip_fingers + columns + strong_fingers,3,0.150218826,0.001129735,0.150218826,TRUE,0.001590343,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + columns + strum,7,0.149337892,0.001209041,0.149337892,TRUE,0.001697307,TRUE
+hands + same_row + columns + strum,4,0.149015966,0.001239279,0.149015966,TRUE,0.00173499,TRUE
+hands + home_row + columns + strum,4,0.148313594,0.001307682,0.148313594,TRUE,0.001825753,TRUE
+hands + skip_fingers + dont_cross_home + columns,4,0.14708795,0.001435422,0.14708795,TRUE,0.001998639,TRUE
+hands + fingers + skip_fingers + same_row + home_row + columns + strum,7,0.146023989,0.001555502,0.146023989,TRUE,0.00215995,TRUE
+hands + fingers + home_row + columns,4,0.144368263,0.001760813,0.144368263,TRUE,0.002438416,TRUE
+hands + fingers + home_row + strong_fingers,4,0.144312288,0.001768169,0.144312288,TRUE,0.002441985,TRUE
+hands + fingers + dont_cross_home + columns,4,0.143609166,0.001863003,0.143609166,TRUE,0.002561787,TRUE
+hands + fingers + skip_fingers + dont_cross_home + home_row + columns + strum,7,0.143587905,0.001865942,0.143587905,TRUE,0.002561787,TRUE
+skip_fingers + dont_cross_home + strum,3,0.143546144,0.001871727,0.143546144,TRUE,0.002561787,TRUE
+hands + dont_cross_home + strum,3,0.143522798,0.001874968,0.143522798,TRUE,0.002561787,TRUE
+fingers + skip_fingers + home_row + strong_fingers,4,0.142751584,0.001984966,0.142751584,TRUE,0.002704847,TRUE
+hands + fingers + dont_cross_home + strum + strong_fingers,5,0.142711238,0.00199088,0.142711238,TRUE,0.00270569,TRUE
+fingers + skip_fingers + same_row + columns,4,0.14099742,0.002257482,0.14099742,TRUE,0.003059875,TRUE
+strong_fingers,1,0.139982643,0.002430322,0.139982643,TRUE,0.003285435,TRUE
+fingers + skip_fingers + same_row + strong_fingers,4,0.139782978,0.002465719,0.139782978,TRUE,0.003324491,TRUE
+fingers + skip_fingers + dont_cross_home + strong_fingers,4,0.139411492,0.00253283,0.139411492,TRUE,0.00340599,TRUE
+hands + skip_fingers + home_row + strum + strong_fingers,5,0.139333478,0.002547134,0.139333478,TRUE,0.003416235,TRUE
+fingers + skip_fingers + same_row + columns + strum,5,0.138969508,0.002614845,0.138969508,TRUE,0.003497869,TRUE
+hands + home_row,2,0.138410738,0.002721992,0.138410738,TRUE,0.003631692,TRUE
+hands + skip_fingers + home_row + strong_fingers,4,0.138172801,0.00276882,0.138172801,TRUE,0.003684549,TRUE
+hands + fingers + same_row + columns,4,0.137501116,0.002904997,0.137501116,TRUE,0.003855723,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row,5,0.136353858,0.003151751,0.136353858,TRUE,0.004172395,TRUE
+skip_fingers + same_row + strum,3,0.134791426,0.003518438,0.134791426,TRUE,0.004645793,TRUE
+hands + fingers + skip_fingers + dont_cross_home + columns + strum + strong_fingers,7,0.134538201,0.003581384,0.134538201,TRUE,0.00471672,TRUE
+hands + fingers + same_row + strong_fingers,4,0.13387826,0.003750258,0.13387826,TRUE,0.004926432,TRUE
+hands + fingers + skip_fingers + same_row + home_row,5,0.132776676,0.004048278,0.132776676,TRUE,0.005304282,TRUE
+skip_fingers + home_row + strum,3,0.132452576,0.004139951,0.132452576,TRUE,0.005410524,TRUE
+hands + dont_cross_home,2,0.132356792,0.004167401,0.132356792,TRUE,0.005432504,TRUE
+fingers + skip_fingers + dont_cross_home + strum + strong_fingers,5,0.132284985,0.004188087,0.132284985,TRUE,0.005445579,TRUE
+hands + skip_fingers + dont_cross_home + columns + strum,5,0.131891773,0.00430302,0.131891773,TRUE,0.005567589,TRUE
+hands + same_row,2,0.131889428,0.004303714,0.131889428,TRUE,0.005567589,TRUE
+hands + fingers + skip_fingers + dont_cross_home + home_row,5,0.131649218,0.004375331,0.131649218,TRUE,0.005645945,TRUE
+hands + fingers + skip_fingers + dont_cross_home + same_row + strum,6,0.130904453,0.004604275,0.130904453,TRUE,0.00592641,TRUE
+hands + skip_fingers + same_row + strum + strong_fingers,5,0.130147794,0.004847897,0.130147794,TRUE,0.00622431,TRUE
+skip_fingers + columns + strum + strong_fingers,4,0.129723542,0.004989523,0.129723542,TRUE,0.006390091,TRUE
+hands + fingers + skip_fingers + dont_cross_home + strong_fingers,5,0.12840876,0.005452429,0.12840876,TRUE,0.006965477,TRUE
+hands + fingers + skip_fingers + same_row + columns + strong_fingers,6,0.128128243,0.005556058,0.128128243,TRUE,0.007080164,TRUE
+fingers + skip_fingers + same_row + strum + strong_fingers,5,0.127494733,0.005796639,0.127494733,TRUE,0.007368365,TRUE
+hands + fingers + skip_fingers + dont_cross_home + home_row + strum,6,0.127039207,0.005975373,0.127039207,TRUE,0.007576713,TRUE
+strum + strong_fingers,2,0.126964614,0.006005107,0.126964614,TRUE,0.007595569,TRUE
+fingers + skip_fingers + home_row + strum + strong_fingers,5,0.126870324,0.006042884,0.126870324,TRUE,0.007624478,TRUE
+hands + fingers + skip_fingers + home_row + columns + strong_fingers,6,0.126754115,0.006089736,0.126754115,TRUE,0.007653461,TRUE
+hands + skip_fingers + dont_cross_home,3,0.126739109,0.00609581,0.126739109,TRUE,0.007653461,TRUE
+hands + skip_fingers + dont_cross_home + strum,4,0.125513909,0.006610443,0.125513909,TRUE,0.008279256,TRUE
+columns + strum,2,0.125151509,0.006769956,0.125151509,TRUE,0.008458306,TRUE
+hands + fingers + skip_fingers + dont_cross_home + strum + strong_fingers,6,0.124828883,0.006914853,0.124828883,TRUE,0.008618268,TRUE
+hands + same_row + strum,3,0.124296254,0.007160152,0.124296254,TRUE,0.008902282,TRUE
+hands + fingers + skip_fingers + same_row + home_row + strum,6,0.124014315,0.007293124,0.124014315,TRUE,0.009045597,TRUE
+hands + fingers + same_row + columns + strum,5,0.123701932,0.007443029,0.123701932,TRUE,0.00920058,TRUE
+hands + fingers + home_row + columns + strum,5,0.123679105,0.007454091,0.123679105,TRUE,0.00920058,TRUE
+hands + fingers + home_row + strum + strong_fingers,5,0.122814057,0.007884254,0.122814057,TRUE,0.009708081,TRUE
+hands + skip_fingers + same_row + strong_fingers,4,0.12264158,0.007972625,0.12264158,TRUE,0.009793297,TRUE
+hands + home_row + strum,3,0.122543227,0.008023413,0.122543227,TRUE,0.009832048,TRUE
+hands + fingers + same_row + strum + strong_fingers,5,0.12235541,0.008121201,0.12235541,TRUE,0.009928071,TRUE
+hands + fingers + dont_cross_home + columns + strum,5,0.12016863,0.009340539,0.12016863,TRUE,0.011391445,TRUE
+hands + fingers + skip_fingers + same_row + columns + strum + strong_fingers,7,0.119396029,0.009808762,0.119396029,TRUE,0.011933993,TRUE
+fingers + columns + strum,3,0.118332352,0.010487463,0.118332352,TRUE,0.012729438,TRUE
+hands + fingers + skip_fingers + home_row + columns + strum + strong_fingers,7,0.115969449,0.012146081,0.115969449,TRUE,0.014707695,TRUE
+fingers + skip_fingers + home_row,3,0.114913489,0.012959404,0.114913489,TRUE,0.015655451,TRUE
+hands + columns + strong_fingers,3,0.113933635,0.01375668,0.113933635,TRUE,0.016579395,TRUE
+hands + skip_fingers + same_row + columns + strum,5,0.113798626,0.01386985,0.113798626,TRUE,0.016676455,TRUE
+fingers + skip_fingers + dont_cross_home,3,0.113620708,0.014020239,0.113620708,TRUE,0.016817705,TRUE
+hands + skip_fingers + same_row + columns,4,0.113191732,0.014388755,0.113191732,TRUE,0.017219329,TRUE
+fingers + skip_fingers + same_row,3,0.112270786,0.015208784,0.112270786,TRUE,0.018158151,TRUE
+fingers + skip_fingers + dont_cross_home + strum,4,0.11090976,0.016495734,0.11090976,TRUE,0.019648765,TRUE
+hands + skip_fingers + home_row + columns,4,0.110630121,0.016771659,0.110630121,TRUE,0.019930971,TRUE
+hands + columns + strum + strong_fingers,4,0.109517226,0.017910183,0.109517226,TRUE,0.021234579,TRUE
+hands + fingers + dont_cross_home,3,0.109111815,0.018341394,0.109111815,TRUE,0.021695491,TRUE
+fingers + skip_fingers + same_row + strum,4,0.1069771,0.020764575,0.1069771,TRUE,0.024505076,TRUE
+fingers + skip_fingers + home_row + strum,4,0.106046844,0.021904695,0.106046844,TRUE,0.025791012,TRUE
+hands + skip_fingers + home_row + columns + strum,5,0.105489332,0.022613684,0.105489332,TRUE,0.026564581,TRUE
+hands + fingers + dont_cross_home + strum,4,0.104878664,0.023413002,0.104878664,TRUE,0.027440468,TRUE
+hands + fingers + skip_fingers + home_row + strong_fingers,5,0.103575568,0.025200748,0.103575568,TRUE,0.029468152,TRUE
+hands + fingers + skip_fingers + dont_cross_home + columns,5,0.102895952,0.026179006,0.102895952,TRUE,0.030542173,TRUE
+hands + fingers + skip_fingers + home_row + strum + strong_fingers,6,0.10256964,0.026660219,0.10256964,TRUE,0.031032738,TRUE
+hands + fingers + skip_fingers + dont_cross_home + columns + strum,6,0.101944519,0.02760338,0.101944519,TRUE,0.032057562,TRUE
+fingers + skip_fingers + columns + strum + strong_fingers,5,0.100355301,0.030131232,0.100355301,TRUE,0.034913967,TRUE
+hands + fingers + same_row,3,0.099509298,0.031556018,0.099509298,TRUE,0.036482184,TRUE
+hands + skip_fingers + same_row + strum,4,0.098960654,0.032510478,0.098960654,TRUE,0.0375008,TRUE
+hands + fingers + skip_fingers + same_row + strum + strong_fingers,6,0.098622486,0.033110973,0.098622486,TRUE,0.038107449,TRUE
+hands + fingers + home_row,3,0.098186299,0.033899477,0.098186299,TRUE,0.038927265,TRUE
+fingers + skip_fingers + columns + strong_fingers,4,0.097735112,0.034731878,0.097735112,TRUE,0.039793699,TRUE
+hands + skip_fingers + home_row + strum,4,0.097532268,0.03511174,0.097532268,TRUE,0.040138924,TRUE
+hands + fingers + same_row + strum,4,0.096026225,0.038044151,0.096026225,TRUE,0.04339411,TRUE
+fingers + strum + strong_fingers,3,0.095791387,0.03851961,0.095791387,TRUE,0.043838576,TRUE
+hands + skip_fingers + columns + strong_fingers,4,0.095553123,0.039007142,0.095553123,TRUE,0.044294777,TRUE
+hands + fingers + skip_fingers + same_row + strong_fingers,5,0.095260607,0.039612816,0.095260607,TRUE,0.044882814,TRUE
+hands + skip_fingers + home_row,3,0.094292498,0.041674393,0.094292498,TRUE,0.047114192,TRUE
+fingers + strong_fingers,2,0.093495933,0.04343789,0.093495933,TRUE,0.048999474,TRUE
+hands + skip_fingers + columns + strum + strong_fingers,5,0.09337847,0.04370318,0.09337847,TRUE,0.049190143,TRUE
+hands + fingers + skip_fingers + dont_cross_home + strum,5,0.093305994,0.043867548,0.093305994,TRUE,0.049266631,TRUE
